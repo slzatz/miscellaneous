@@ -1,10 +1,19 @@
 import socket
 import pygame
 import os
+import platform
 from time import sleep
 
-os.putenv('SDL_VIDEODRIVER', 'fbcon')
-os.putenv('SDL_FBDEV', '/dev/fb1')
+if platform.machine() == 'armv6l':
+    # from https://github.com/adafruit/adafruit-pi-cam/blob/master/cam.py
+    os.putenv('SDL_VIDEODRIVER', 'fbcon')
+    os.putenv('SDL_FBDEV', '/dev/fb1')
+elif platform.system() == 'Windows':
+    os.environ['SDL_VIDEODRIVER'] = 'windib'
+elif platform.system() == "Linux":
+    os.putenv('SDL_VIDEODRIVER', 'x11')
+else:
+    sys.exit("Currently unsupported hardware/OS")
 
 pygame.init()
 pygame.mouse.set_visible(0)

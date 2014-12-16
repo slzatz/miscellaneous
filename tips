@@ -1,0 +1,78 @@
+za - toggle folding; zR - unfold everything; zM - fold everything.  the following do not seem to do anything right now: zm, zr
+There is a _vimrc in c:\Program Files (x86)\Vim <- this one is being used because commenting out stuff here does affect vim. There are also _gvimrc and _vimrc and _viminfo in c:\Users\szatz (appear not to be in use). As far as vim is concerned $HOME is in H: and it is using the _vimrc because that is where the system _vimrc is kept. Then at some point VIM decided that home was c:\Users\szatz
+:echo $HOME and :version are helpful
+Supports :cd, :pwd, :ls (tells you what files are open same as :buffers :files)
+escape clears the command line
+:b2 after ls will open buffer #2
+:badd ft.txt - creates a new buffer for a file without opening it
+:vert sb[buffer]N or :vert Nsb will open buffer N in a vertical split; sbN by itself would be horizontal split
+:w {file} keeps the current file but saves file as something else
+:e! {file} opens the file and overwrites buffer even if something there
+:e # edits the alternate-file (the last one you had open)
+:e . shows a directory listing of the current directly; :e .. would be the parent directory etc
+:sav {file} is the equivalent of save as ...
+:r foo.txt    Insert the file foo.txt below the cursor.
+:0r foo.txt   Insert the file foo.txt before the first line.
+. repeats last command
+c{motion} - delete the characters and enter insert mode; pretty pointless, just do [N]s, but cc, cw, c$ would be useful
+{N}s - delete characters and put into insert mode; "z5s will put 5 characters into register z, delete 5 char and put into insert mode
+~ switch case
+f{char} - find the character in current line -- ";" repeats the search t{char} puts cursor before the character
+J combines two lines by removing the line change character from the current line
+:tabnew, :tabn, :tabp, :tabfirst, :tablast, gt - go to next tab, 3gt - go to third tab, gT - go to previous tab
+find next instance of word * go backward #
+/\<abc = will find words that start with abc; /\<abc\>
+G - go to end; gg go to beginning; 10gg go to line 10
+Vjjjj> will select a bunch of lines and then let you indent
+How to comment out Control-v jjjjjI# Esc [note on windows this is ctrl-Q since ctrl-v does paste]
+How to remove comments:  <c-v>jjjj x
+a Append text following current cursor position; A Append text to the end of current line - equivalent of $a
+i Insert text before the current cursor position; I Insert text at the beginning of the cursor line
+o Open up a new line following the current line and add text there
+O Open up a new line before the current line and add text there
+d$ = D delete from cursor to the end of the line
+You can do :cd to put vim into a directory so that e then looks at that directory
+word navigation: b skips backword one word and w skips forward one word;e goes to end of word
+$ goes to end of line; ^ goes to the first non-whitespace at the beginning of line;0 goes to the beginning of the line
+yiw yanks the current word then move the cursor and then do viwp to replace the word under the cursor; aw--> a word; iw-->inner word
+`` takes you to last cursor position
+dw deletes from cursor to end of word
+db deletes from cursor to beginning of word
+"ap will paste what is in register a; "add will put the deleted line into register a
+daw - delete word under cursor no matter where cursor is and remove extra space - I think generally more useful than diw (delete inner word)
+d3e - delete next 3 words
+r{letter} replace letter under cursor with {letter}
+R just starts letting you overwrite - useful
+:%s/foo/bar/g  Find each occurrence of 'foo' (in all lines), and replace it with 'bar'.
+:s/foo/bar/g   Find each occurrence of 'foo' (in the current line only), and replace it with 'bar'.
+:%s/foo/bar/gc  Change each 'foo' to 'bar', but ask for confirmation first.
+:%s/\<foo\>/bar/gc  Change only whole words exactly matching 'foo' to 'bar'; ask for confirmation.
+
+:e filename      - edit another file
+:split filename  - split window and load another file
+ctrl-w up arrow  - move cursor up a window
+ctrl-w ctrl-w    - move cursor to another window (cycle)
+ctrl-w_          - maximize current window
+ctrl-w=          - make all equal size
+10 ctrl-w+       - increase window size by 10 lines
+:vsplit file     - vertical split
+:sview file      - same as split, but readonly
+:hide            - close current window
+:only            - keep only this window open
+:ls              - show current buffers
+:b 2             - open buffer #2 in this window
+
+:set            - shows vars different from defaults
+:set all        - shows all values
+:set foo?       - shows the value of foo
+:set foo+=opt   - add opt to the value w/o changing others
+:set foo-=opt   - remove opt from value
+:set foo&       - reset foo to default value
+:setlocal foo   - only the current buffer
+
+:verbose set foo?   - tells you where it was last set!
+H,M,L - move to first visible line, middle visible line or last visible line
+zEnter, z., and z- move the screen but retain current line
+Control shift F,B,D move around by screen
+the rain in spain falls mainly on the plain
+fhjdfhjd; ljfdsdsljf kjlsdjflkds

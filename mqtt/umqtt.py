@@ -230,26 +230,26 @@ def topic_matches_sub(sub, topic):
     return result
 
 
-def _socketpair_compat():
-    """TCP/IP socketpair including Windows support"""
-    listensock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_IP)
-    listensock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    listensock.bind(("127.0.0.1", 0))
-    listensock.listen(1)
-
-    iface, port = listensock.getsockname()
-    print("port =", port)
-    sock1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_IP)
-    sock1.setblocking(0)
-    try:
-        sock1.connect(("127.0.0.1", port))
-    except socket.error as err:
-        if err.errno != errno.EINPROGRESS and err.errno != errno.EWOULDBLOCK and err.errno != EAGAIN:
-            raise
-    sock2, address = listensock.accept()
-    sock2.setblocking(0)
-    listensock.close()
-    return (sock1, sock2)
+#def _socketpair_compat():
+#    """TCP/IP socketpair including Windows support"""
+#    listensock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_IP)
+#    listensock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+#    listensock.bind(("127.0.0.1", 0))
+#    listensock.listen(1)
+#
+#    iface, port = listensock.getsockname()
+#    print("port =", port)
+#    sock1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_IP)
+#    sock1.setblocking(0)
+#    try:
+#        sock1.connect(("127.0.0.1", port))
+#    except socket.error as err:
+#        if err.errno != errno.EINPROGRESS and err.errno != errno.EWOULDBLOCK and err.errno != EAGAIN:
+#            raise
+#    sock2, address = listensock.accept()
+#    sock2.setblocking(0)
+#    listensock.close()
+#    return (sock1, sock2)
 
 
 class MQTTMessage:
@@ -397,15 +397,7 @@ class Client(object):
         self._userdata = userdata
         self._sock = None
         #self._sockpairR, self._sockpairW = _socketpair_compat()
-        sock1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_IP)
-        sock1.setblocking(0)
-        try:
-            sock1.connect(("127.0.0.1", 40000))
-        except socket.error as err:
-            if err.errno != errno.EINPROGRESS and err.errno != errno.EWOULDBLOCK and err.errno != EAGAIN:
-                raise
-        self._sockpairR = sock1
-        self._sockpairR = None
+        #self._sockpairR = None
         self._keepalive = 60
         self._message_retry = 20
         self._last_retry_check = 0
@@ -463,9 +455,9 @@ class Client(object):
         if self._sock:
             self._sock.close()
             self._sock = None
-        if self._sockpairR:
-            self._sockpairR.close()
-            self._sockpairR = None
+        #if self._sockpairR:
+        #    self._sockpairR.close()
+        #    self._sockpairR = None
         #if self._sockpairW:
             #self._sockpairW.close()
             #self._sockpairW = None
@@ -603,7 +595,9 @@ class Client(object):
 
         # sockpairR is used to break out of select() before the timeout, on a
         # call to publish() etc.
-        rlist = [self.socket(), self._sockpairR]
+        #rlist = [self.socket(), self._sockpairR]
+        rlist = [self.socket()]
+        #rlist[0].recv(1)
         print("rlist =",rlist)
         print("wlist =", wlist)
         try:
@@ -617,23 +611,23 @@ class Client(object):
             return MQTT_ERR_CONN_LOST
         except:
             return MQTT_ERR_UNKNOWN
-        print("self.socket() =",self.socket())
+        #print("self.socket() =",self.socket())
         print("socklist =",socklist)
         if self.socket() in socklist[0]:
             rc = self.loop_read(max_packets)
             if rc or (self._sock is None):
                 return rc
 
-        if self._sockpairR in socklist[0]:
-            # Stimulate output write even though we didn't ask for it, because
-            # at that point the publish or other command wasn't present.
-            socklist[1].insert(0, self.socket())
-            # Clear sockpairR - only ever a single byte written.
-            try:
-                self._sockpairR.recv(1)
-            except socket.error as err:
-                if err.errno != EAGAIN:
-                    raise
+        #if self._sockpairR in socklist[0]:
+        #    # Stimulate output write even though we didn't ask for it, because
+        #    # at that point the publish or other command wasn't present.
+        #    socklist[1].insert(0, self.socket())
+        #    # Clear sockpairR - only ever a single byte written.
+        #    try:
+        #        self._sockpairR.recv(1)
+        #    except socket.error as err:
+        #        if err.errno != EAGAIN:
+        #            raise
 
         if self.socket() in socklist[1]:
             rc = self.loop_write(max_packets)

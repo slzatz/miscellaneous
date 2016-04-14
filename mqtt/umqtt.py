@@ -229,29 +229,6 @@ def topic_matches_sub(sub, topic):
 
     return result
 
-
-#def _socketpair_compat():
-#    """TCP/IP socketpair including Windows support"""
-#    listensock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_IP)
-#    listensock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-#    listensock.bind(("127.0.0.1", 0))
-#    listensock.listen(1)
-#
-#    iface, port = listensock.getsockname()
-#    print("port =", port)
-#    sock1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_IP)
-#    sock1.setblocking(0)
-#    try:
-#        sock1.connect(("127.0.0.1", port))
-#    except socket.error as err:
-#        if err.errno != errno.EINPROGRESS and err.errno != errno.EWOULDBLOCK and err.errno != EAGAIN:
-#            raise
-#    sock2, address = listensock.accept()
-#    sock2.setblocking(0)
-#    listensock.close()
-#    return (sock1, sock2)
-
-
 class MQTTMessage:
     """ This is a class that describes an incoming message. It is passed to the
     on_message callback as the message parameter.
@@ -396,8 +373,6 @@ class Client(object):
         self._protocol = protocol
         self._userdata = userdata
         self._sock = None
-        #self._sockpairR, self._sockpairW = _socketpair_compat()
-        #self._sockpairR = None
         self._keepalive = 60
         self._message_retry = 20
         self._last_retry_check = 0
@@ -455,12 +430,6 @@ class Client(object):
         if self._sock:
             self._sock.close()
             self._sock = None
-        #if self._sockpairR:
-        #    self._sockpairR.close()
-        #    self._sockpairR = None
-        #if self._sockpairW:
-            #self._sockpairW.close()
-            #self._sockpairW = None
 
         self.__init__(client_id, clean_session, userdata)
 
@@ -597,7 +566,6 @@ class Client(object):
         # call to publish() etc.
         #rlist = [self.socket(), self._sockpairR]
         rlist = [self.socket()]
-        #rlist[0].recv(1)
         print("rlist =",rlist)
         print("wlist =", wlist)
         try:
@@ -611,23 +579,11 @@ class Client(object):
             return MQTT_ERR_CONN_LOST
         except:
             return MQTT_ERR_UNKNOWN
-        #print("self.socket() =",self.socket())
         print("socklist =",socklist)
         if self.socket() in socklist[0]:
             rc = self.loop_read(max_packets)
             if rc or (self._sock is None):
                 return rc
-
-        #if self._sockpairR in socklist[0]:
-        #    # Stimulate output write even though we didn't ask for it, because
-        #    # at that point the publish or other command wasn't present.
-        #    socklist[1].insert(0, self.socket())
-        #    # Clear sockpairR - only ever a single byte written.
-        #    try:
-        #        self._sockpairR.recv(1)
-        #    except socket.error as err:
-        #        if err.errno != EAGAIN:
-        #            raise
 
         if self.socket() in socklist[1]:
             rc = self.loop_write(max_packets)
@@ -907,16 +863,6 @@ class Client(object):
             elif rc == MQTT_ERR_AGAIN:
                 return MQTT_ERR_SUCCESS
         return MQTT_ERR_SUCCESS
-
-    #def want_write(self):
-    #    """Call to determine if there is network data waiting to be written.
-    #    Useful if you are calling select() yourself rather than using loop().
-    #    """
-    #    print("want_write")
-    #    if self._current_out_packet or len(self._out_packet) > 0:
-    #        return True
-    #    else:
-    #        return False
 
     def loop_misc(self):
         """Process miscellaneous network events. Use in place of calling loop() if you
@@ -1464,6 +1410,7 @@ class Client(object):
         return (self._packet_queue(command, packet, local_mid, 1), local_mid)
 
     def _message_retry_check_actual(self, messages):
+        print("_message_retry_check_actual") #needed
         now = time.time()
         for m in messages:
             if m.timestamp + self._message_retry < now:
@@ -1481,10 +1428,12 @@ class Client(object):
                     self._send_pubrel(m.mid, True)
 
     def _message_retry_check(self):
+        print("_message_retry_check") #needed
         self._message_retry_check_actual(self._out_messages)
         self._message_retry_check_actual(self._in_messages)
 
     def _messages_reconnect_reset_out(self):
+        print("_messages_reconnect_reset_out") #needed
         self._inflight_messages = 0
         for m in self._out_messages:
             m.timestamp = 0
@@ -1509,6 +1458,7 @@ class Client(object):
                 m.state = mqtt_ms_queued
 
     def _messages_reconnect_reset_in(self):
+        print("_messages_reconnect_reset_in") #needed
         for m in self._in_messages:
             m.timestamp = 0
             if m.qos != 2:
@@ -1518,11 +1468,12 @@ class Client(object):
                 pass
 
     def _messages_reconnect_reset(self):
+        print("_messages_reconnect_reset") #needed
         self._messages_reconnect_reset_out()
         self._messages_reconnect_reset_in()
 
     def _packet_queue(self, command, packet, mid, qos):
-        print("_packet_queue")
+        print("_packet_queue") #needed
         mpkt = dict(
             command = command,
             mid = mid,
@@ -1561,7 +1512,7 @@ class Client(object):
             return self._handle_pubackcomp("PUBACK")
         elif cmd == PUBCOMP:
             return self._handle_pubackcomp("PUBCOMP")
-        elif cmd == PUBLISH:
+        elif cmd == PUBLISH: #appear to need PUBLISH
             return self._handle_publish()
         elif cmd == PUBREC:
             return self._handle_pubrec()
@@ -1578,26 +1529,27 @@ class Client(object):
             self._easy_log(MQTT_LOG_ERR, "Error: Unrecognised command "+str(cmd))
             return MQTT_ERR_PROTOCOL
 
-    def _handle_pingreq(self):
-        if self._strict_protocol:
-            if self._in_packet['remaining_length'] != 0:
-                return MQTT_ERR_PROTOCOL
+    #def _handle_pingreq(self):
+    #    if self._strict_protocol:
+    #        if self._in_packet['remaining_length'] != 0:
+    #            return MQTT_ERR_PROTOCOL
 
-        self._easy_log(MQTT_LOG_DEBUG, "Received PINGREQ")
-        return self._send_pingresp()
+    #    self._easy_log(MQTT_LOG_DEBUG, "Received PINGREQ")
+    #    return self._send_pingresp()
 
-    def _handle_pingresp(self):
-        if self._strict_protocol:
-            if self._in_packet['remaining_length'] != 0:
-                return MQTT_ERR_PROTOCOL
+    #def _handle_pingresp(self):
+    #    print("_handle_pingresp")
+    #    if self._strict_protocol:
+    #        if self._in_packet['remaining_length'] != 0:
+    #            return MQTT_ERR_PROTOCOL
 
-        # No longer waiting for a PINGRESP.
-        self._ping_t = 0
-        self._easy_log(MQTT_LOG_DEBUG, "Received PINGRESP")
-        return MQTT_ERR_SUCCESS
+    #    # No longer waiting for a PINGRESP.
+    #    self._ping_t = 0
+    #    self._easy_log(MQTT_LOG_DEBUG, "Received PINGRESP")
+    #    return MQTT_ERR_SUCCESS
 
     def _handle_connack(self):
-        print("_handle_conneck")
+        print("_handle_connack") #needed
         if self._strict_protocol:
             if self._in_packet['remaining_length'] != 2:
                 return MQTT_ERR_PROTOCOL
@@ -1676,6 +1628,7 @@ class Client(object):
             return MQTT_ERR_PROTOCOL
 
     def _handle_suback(self):
+        print("_handle_suback") #needed after _packet_handle
         self._easy_log(MQTT_LOG_DEBUG, "Received SUBACK")
         pack_format = "!H" + str(len(self._in_packet['packet'])-2) + 's'
         (mid, packet) = struct.unpack(pack_format, self._in_packet['packet'])
@@ -1691,7 +1644,7 @@ class Client(object):
 
     def _handle_publish(self):
         rc = 0
-        print("_handle_publish")
+        print("_handle_publish") #needed after packet_handle
         header = self._in_packet['command']
         message = MQTTMessage()
         message.dup = (header & 0x08)>>3

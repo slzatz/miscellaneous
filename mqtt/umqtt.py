@@ -17,15 +17,19 @@ This is an MQTT v3.1 client module. MQTT is a lightweight pub/sub messaging
 protocol that is easy to implement and suitable for low powered devices.
 """
 import errno
-import platform
-import random
-import select
-import socket
-import struct
 import sys
-import time
+try:
+    import uselect as select
+    import usocket as socket
+    import ustruct as struct
+    import utime as time
+except:
+    import select
+    import socket
+    import struct
+    import time
 #FIXME
-if platform.system() == 'Windows':
+if sys.platform != 'linux':
     EAGAIN = errno.WSAEWOULDBLOCK
 else:
     EAGAIN = errno.EAGAIN
@@ -234,6 +238,7 @@ def _socketpair_compat():
     listensock.listen(1)
 
     iface, port = listensock.getsockname()
+    print("port =", port)
     sock1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_IP)
     sock1.setblocking(0)
     try:
@@ -391,13 +396,22 @@ class Client(object):
         self._protocol = protocol
         self._userdata = userdata
         self._sock = None
-        self._sockpairR, self._sockpairW = _socketpair_compat()
+        #self._sockpairR, self._sockpairW = _socketpair_compat()
+        sock1 = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_IP)
+        sock1.setblocking(0)
+        try:
+            sock1.connect(("127.0.0.1", 40000))
+        except socket.error as err:
+            if err.errno != errno.EINPROGRESS and err.errno != errno.EWOULDBLOCK and err.errno != EAGAIN:
+                raise
+        self._sockpairR = sock1
+        self._sockpairR = None
         self._keepalive = 60
         self._message_retry = 20
         self._last_retry_check = 0
         self._clean_session = clean_session
         if client_id == "" or client_id is None:
-            self._client_id = "paho/" + "".join(random.choice("0123456789ADCDEF") for x in range(23-5))
+            self._client_id = "umqtt"
         else:
             self._client_id = client_id
 
@@ -452,9 +466,9 @@ class Client(object):
         if self._sockpairR:
             self._sockpairR.close()
             self._sockpairR = None
-        if self._sockpairW:
-            self._sockpairW.close()
-            self._sockpairW = None
+        #if self._sockpairW:
+            #self._sockpairW.close()
+            #self._sockpairW = None
 
         self.__init__(client_id, clean_session, userdata)
 

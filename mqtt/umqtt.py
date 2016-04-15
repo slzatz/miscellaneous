@@ -515,11 +515,10 @@ class Client(object):
         # Put messages in progress in a valid state.
         self._messages_reconnect_reset()
 
-        try:
-            sock = socket.create_connection((self._host, self._port), source_address=(self._bind_address, 0))
-        except socket.error as err:
-            if err.errno != errno.EINPROGRESS and err.errno != errno.EWOULDBLOCK and err.errno != EAGAIN:
-                raise
+        #sock = socket.create_connection((self._host, self._port), source_address=(self._bind_address, 0))
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((self._host, self._port))
+        #sock.listen(1)
 
         self._sock = sock
         self._sock.setblocking(0)

@@ -1,8 +1,7 @@
-import umqtt as mqtt
-try:
-    import utime as time
-except:
-    import time
+import umqtt2 as mqtt
+
+import utime as time
+
 # The callback for when the client receives a CONNACK response from the server.
 def on_connect(client, userdata, flags, rc):
     print("Connected with result code "+str(rc))

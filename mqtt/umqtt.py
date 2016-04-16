@@ -1,5 +1,6 @@
 # Copyright (c) 2012-2014 Roger Light <roger@atchoo.org>
 #
+# This is a stripped down version of paho.mqtt intended for micropython
 # All rights reserved. This program and the accompanying materials
 # are made available under the terms of the Eclipse Public License v1.0
 # and Eclipse Distribution License v1.0 which accompany this distribution.
@@ -18,20 +19,12 @@ protocol that is easy to implement and suitable for low powered devices.
 """
 import errno
 import sys
-try:
-    import select
-    #import usocket as socket
-    import socket
-    import ustruct as struct
-    import utime as time
-except:
-    import struct
-    import time
-#FIXME
-if sys.platform != 'linux':
-    EAGAIN = errno.WSAEWOULDBLOCK
-else:
-    EAGAIN = errno.EAGAIN
+import select
+import socket
+import ustruct as struct
+import utime as time
+
+EAGAIN = errno.EAGAIN
 
 MQTTv31 = 3
 MQTTv311 = 4
@@ -231,14 +224,6 @@ def topic_matches_sub(sub, topic):
 class MQTTMessage:
     """ This is a class that describes an incoming message. It is passed to the
     on_message callback as the message parameter.
-
-    Members:
-
-    topic : String. topic that the message was published on.
-    payload : String/bytes the message payload.
-    qos : Integer. The message Quality of Service 0, 1 or 2.
-    retain : Boolean. If true, the message is a retained message and not fresh.
-    mid : Integer. The message id.
     """
     def __init__(self):
         self.timestamp = 0
@@ -254,118 +239,8 @@ class Client(object):
     """MQTT version 3.1/3.1.1 client class.
 
     This is the main class for use communicating with an MQTT broker.
-
-    General usage flow:
-
-    * Use connect()/connect_async() to connect to a broker
-    * Call loop() frequently to maintain network traffic flow with the broker
-    * Or use loop_start() to set a thread running to call loop() for you.
-    * Or use loop_forever() to handle calling loop() for you in a blocking
-    * function.
-    * Use subscribe() to subscribe to a topic and receive messages
-    * Use publish() to send messages
-    * Use disconnect() to disconnect from the broker
-
-    Data returned from the broker is made available with the use of callback
-    functions as described below.
-
-    Callbacks
-    =========
-
-    A number of callback functions are available to receive data back from the
-    broker. To use a callback, define a function and then assign it to the
-    client:
-
-    def on_connect(client, userdata, flags, rc):
-        print("Connection returned " + str(rc))
-
-    client.on_connect = on_connect
-
-    All of the callbacks as described below have a "client" and an "userdata"
-    argument. "client" is the Client instance that is calling the callback.
-    "userdata" is user data of any type and can be set when creating a new client
-    instance or with user_data_set(userdata).
-
-    The callbacks:
-
-    on_connect(client, userdata, flags, rc): called when the broker responds to our connection
-      request.
-      flags is a dict that contains response flags from the broker:
-        flags['session present'] - this flag is useful for clients that are
-            using clean session set to 0 only. If a client with clean
-            session=0, that reconnects to a broker that it has previously
-            connected to, this flag indicates whether the broker still has the
-            session information for the client. If 1, the session still exists.
-      The value of rc determines success or not:
-        0: Connection successful
-        1: Connection refused - incorrect protocol version
-        2: Connection refused - invalid client identifier
-        3: Connection refused - server unavailable
-        4: Connection refused - bad username or password
-        5: Connection refused - not authorised
-        6-255: Currently unused.
-
-    on_disconnect(client, userdata, rc): called when the client disconnects from the broker.
-      The rc parameter indicates the disconnection state. If MQTT_ERR_SUCCESS
-      (0), the callback was called in response to a disconnect() call. If any
-      other value the disconnection was unexpected, such as might be caused by
-      a network error.
-
-    on_message(client, userdata, message): called when a message has been received on a
-      topic that the client subscribes to. The message variable is a
-      MQTTMessage that describes all of the message parameters.
-
-    on_publish(client, userdata, mid): called when a message that was to be sent using the
-      publish() call has completed transmission to the broker. For messages
-      with QoS levels 1 and 2, this means that the appropriate handshakes have
-      completed. For QoS 0, this simply means that the message has left the
-      client. The mid variable matches the mid variable returned from the
-      corresponding publish() call, to allow outgoing messages to be tracked.
-      This callback is important because even if the publish() call returns
-      success, it does not always mean that the message has been sent.
-
-    on_subscribe(client, userdata, mid, granted_qos): called when the broker responds to a
-      subscribe request. The mid variable matches the mid variable returned
-      from the corresponding subscribe() call. The granted_qos variable is a
-      list of integers that give the QoS level the broker has granted for each
-      of the different subscription requests.
-
-    on_unsubscribe(client, userdata, mid): called when the broker responds to an unsubscribe
-      request. The mid variable matches the mid variable returned from the
-      corresponding unsubscribe() call.
-
-    on_log(client, userdata, level, buf): called when the client has log information. Define
-      to allow debugging. The level variable gives the severity of the message
-      and will be one of MQTT_LOG_INFO, MQTT_LOG_NOTICE, MQTT_LOG_WARNING,
-      MQTT_LOG_ERR, and MQTT_LOG_DEBUG. The message itself is in buf.
-
     """
     def __init__(self, client_id="", clean_session=True, userdata=None, protocol=MQTTv31):
-        """client_id is the unique client id string used when connecting to the
-        broker. If client_id is zero length or None, then one will be randomly
-        generated. In this case, clean_session must be True. If this is not the
-        case a ValueError will be raised.
-
-        clean_session is a boolean that determines the client type. If True,
-        the broker will remove all information about this client when it
-        disconnects. If False, the client is a persistent client and
-        subscription information and queued messages will be retained when the
-        client disconnects.
-        Note that a client will never discard its own outgoing messages on
-        disconnect. Calling connect() or reconnect() will cause the messages to
-        be resent.  Use reinitialise() to reset a client to its original state.
-
-        userdata is user defined data of any type that is passed as the "userdata"
-        parameter to callbacks. It may be updated at a later point with the
-        user_data_set() function.
-
-        The protocol argument allows explicit setting of the MQTT version to
-        use for this client. Can be paho.mqtt.client.MQTTv311 (v3.1.1) or
-        paho.mqtt.client.MQTTv31 (v3.1), with the default being v3.1. If the
-        broker reports that the client connected with an invalid protocol
-        version, the client will automatically attempt to reconnect using v3.1
-        instead.
-        """
         if not clean_session and (client_id == "" or client_id is None):
             raise ValueError('A client id must be provided if clean session is False.')
 
@@ -434,14 +309,6 @@ class Client(object):
 
     def connect(self, host, port=1883, keepalive=60, bind_address=""):
         """Connect to a remote broker.
-
-        host is the hostname or IP address of the remote broker.
-        port is the network port of the server host to connect to. Defaults to
-        1883. Note that the default port for MQTT over SSL/TLS is 8883 so if you
-        are using tls_set() the port may need providing.
-        keepalive: Maximum period in seconds between communications with the
-        broker. If no other messages are being exchanged, this controls the
-        rate at which the client will send ping messages to the broker.
         """
         print("connect")
         self.connect_async(host, port, keepalive, bind_address)
@@ -451,14 +318,6 @@ class Client(object):
         """Connect to a remote broker asynchronously. This is a non-blocking
         connect call that can be used with loop_start() to provide very quick
         start.
-
-        host is the hostname or IP address of the remote broker.
-        port is the network port of the server host to connect to. Defaults to
-        1883. Note that the default port for MQTT over SSL/TLS is 8883 so if you
-        are using tls_set() the port may need providing.
-        keepalive: Maximum period in seconds between communications with the
-        broker. If no other messages are being exchanged, this controls the
-        rate at which the client will send ping messages to the broker.
         """
         print("connect_async")
         if host is None or len(host) == 0:
@@ -467,9 +326,6 @@ class Client(object):
             raise ValueError('Invalid port number.')
         if keepalive < 0:
             raise ValueError('Keepalive must be >=0.')
-        if bind_address != "" and bind_address is not None:
-            if (sys.version_info[0] == 2 and sys.version_info[1] < 7) or (sys.version_info[0] == 3 and sys.version_info[1] < 2):
-                raise ValueError('bind_address requires Python 2.7 or 3.2.')
 
         self._host = host
         self._port = port
@@ -517,94 +373,17 @@ class Client(object):
         sock = socket.create_connection((self._host, self._port), source_address=(self._bind_address, 0))
         self._sock = sock
         self._sock.setblocking(0)
+        self.ep = select.epoll()
+        self.fileno = self._sock.fileno()
+        self.ep.register(self.fileno)
 
         print("self._sock =", self._sock)
 
         return self._send_connect(self._keepalive, self._clean_session)
 
-    def xxxloop(self, timeout=1.0, max_packets=1):
-        """Process network events.
-
-        This function must be called regularly to ensure communication with the
-        broker is carried out. It calls select() on the network socket to wait
-        for network events. If incoming data is present it will then be
-        processed. Outgoing commands, from e.g. publish(), are normally sent
-        immediately that their function is called, but this is not always
-        possible. loop() will also attempt to send any remaining outgoing
-        messages, which also includes commands that are part of the flow for
-        messages with QoS>0.
-
-        timeout: The time in seconds to wait for incoming/outgoing network
-          traffic before timing out and returning.
-        max_packets: Not currently used.
-
-        Returns MQTT_ERR_SUCCESS on success.
-        Returns >0 on error.
-
-        A ValueError will be raised if timeout < 0"""
-        print("loop")
-        if timeout < 0.0:
-            raise ValueError('Invalid timeout.')
-
-        print("self._current_out_packet =", self._current_out_packet)
-        print("self._out_packet =", self._out_packet)
-        if self._current_out_packet is None and len(self._out_packet) > 0:
-            self._current_out_packet = self._out_packet.pop(0)
-        print("self._current_out_packet =", self._current_out_packet)
-        if self._current_out_packet:
-            wlist = [self.socket()]
-        else:
-            wlist = []
-
-        # sockpairR is used to break out of select() before the timeout, on a
-        # call to publish() etc.
-        #rlist = [self.socket(), self._sockpairR]
-        rlist = [self.socket()]
-        print("rlist =",rlist)
-        print("wlist =", wlist)
-        try:
-            socklist = select.select(rlist, wlist, [], timeout)
-        except TypeError:
-            # Socket isn't correct type, in likelihood connection is lost
-            return MQTT_ERR_CONN_LOST
-        except ValueError:
-            # Can occur if we just reconnected but rlist/wlist contain a -1 for
-            # some reason.
-            return MQTT_ERR_CONN_LOST
-        except:
-            return MQTT_ERR_UNKNOWN
-        print("socklist =",socklist)
-        if self.socket() in socklist[0]:
-            rc = self.loop_read(max_packets)
-            if rc or (self._sock is None):
-                return rc
-
-        if self.socket() in socklist[1]:
-            rc = self.loop_write(max_packets)
-            if rc or (self._sock is None):
-                return rc
-        return self.loop_misc()
-
     def loop(self, timeout=1.0, max_packets=1):
         """Process network events.
-
-        This function must be called regularly to ensure communication with the
-        broker is carried out. It calls select() on the network socket to wait
-        for network events. If incoming data is present it will then be
-        processed. Outgoing commands, from e.g. publish(), are normally sent
-        immediately that their function is called, but this is not always
-        possible. loop() will also attempt to send any remaining outgoing
-        messages, which also includes commands that are part of the flow for
-        messages with QoS>0.
-
-        timeout: The time in seconds to wait for incoming/outgoing network
-          traffic before timing out and returning.
-        max_packets: Not currently used.
-
-        Returns MQTT_ERR_SUCCESS on success.
-        Returns >0 on error.
-
-        A ValueError will be raised if timeout < 0"""
+        """
         print("loop")
         if timeout < 0.0:
             raise ValueError('Invalid timeout.')
@@ -614,57 +393,20 @@ class Client(object):
         if self._current_out_packet is None and len(self._out_packet) > 0:
             self._current_out_packet = self._out_packet.pop(0)
         print("self._current_out_packet =", self._current_out_packet)
-        if self._current_out_packet:
-            wlist = [self.socket()]
-        else:
-            wlist = []
 
-        # sockpairR is used to break out of select() before the timeout, on a
-        # call to publish() etc.
-        #rlist = [self.socket(), self._sockpairR]
-        #rlist = [self.socket()]
-        #print("rlist =",rlist)
-        #print("wlist =", wlist)
+        events = self.ep.poll(1)
+        print("events = ", events)
+        for fileno, ev in events:
+            if ev & select.EPOLLIN:
+                rc = self.loop_read(max_packets)
+                if rc or (self._sock is None):
+                    return rc
 
-        ep = select.epoll()
-        print(self.socket())
-        fileno = self.socket().fileno()
-        #print("fileno =", self.socket().fileno())
-        #ep.register(self.socket().fileno(), select.EPOLLIN)
-        ep.register(fileno, select.EPOLLIN)
-        res = ep.poll(self.socket().fileno())
-        print("res = ", res)
-        f,x = res[0] if res else (0,0)
-        if f==fileno:
-            rc = self.loop_read(max_packets)
-            if rc or (self._sock is None):
-                return rc
+            if ev & select.EPOLLOUT and self._current_out_packet:
+                rc = self.loop_write(max_packets)
+                if rc or (self._sock is None):
+                    return rc
 
-        ep = select.epoll()
-        print(self.socket())
-        fileno = self.socket().fileno()
-        #print("fileno =", self.socket().fileno())
-        #ep.register(self.socket().fileno(), select.EPOLLIN)
-        ep.register(fileno, select.EPOLLOUT)
-        res = ep.poll(self.socket().fileno())
-        print("res = ", res)
-        f,x = res[0] if res else (0,0)
-        if f==fileno:
-            rc = self.loop_write(max_packets)
-            if rc or (self._sock is None):
-                return rc
-        #except:
-            #return MQTT_ERR_UNKNOWN
-        #print("socklist =",socklist)
-        #if self.socket() in socklist[0]:
-        #    rc = self.loop_read(max_packets)
-        #    if rc or (self._sock is None):
-        #        return rc
-
-        #if self.socket() in socklist[1]:
-        #    rc = self.loop_write(max_packets)
-        #    if rc or (self._sock is None):
-        #        return rc
         return self.loop_misc()
 
 #    def publish(self, topic, payload=None, qos=0, retain=False):
@@ -779,48 +521,7 @@ class Client(object):
         return self._send_disconnect()
 
     def subscribe(self, topic, qos=0):
-        """Subscribe the client to one or more topics.
-
-        This function may be called in three different ways:
-
-        Simple string and integer
-        -------------------------
-        e.g. subscribe("my/topic", 2)
-
-        topic: A string specifying the subscription topic to subscribe to.
-        qos: The desired quality of service level for the subscription.
-             Defaults to 0.
-
-        String and integer tuple
-        ------------------------
-        e.g. subscribe(("my/topic", 1))
-
-        topic: A tuple of (topic, qos). Both topic and qos must be present in
-               the tuple.
-        qos: Not used.
-
-        List of string and integer tuples
-        ------------------------
-        e.g. subscribe([("my/topic", 0), ("another/topic", 2)])
-
-        This allows multiple topic subscriptions in a single SUBSCRIPTION
-        command, which is more efficient than using multiple calls to
-        subscribe().
-
-        topic: A list of tuple of format (topic, qos). Both topic and qos must
-               be present in all of the tuples.
-        qos: Not used.
-
-        The function returns a tuple (result, mid), where result is
-        MQTT_ERR_SUCCESS to indicate success or (MQTT_ERR_NO_CONN, None) if the
-        client is not currently connected.  mid is the message ID for the
-        subscribe request. The mid value can be used to track the subscribe
-        request by checking against the mid argument in the on_subscribe()
-        callback if it is defined.
-
-        Raises a ValueError if qos is not 0, 1 or 2, or if topic is None or has
-        zero string length, or if topic is not a string, tuple or list.
-        """
+        """Subscribe the client to one or more topics."""
         print("subscribe")
         topic_qos_list = None
         if isinstance(topic, str):
@@ -853,21 +554,7 @@ class Client(object):
         return self._send_subscribe(False, topic_qos_list)
 
     def unsubscribe(self, topic):
-        """Unsubscribe the client from one or more topics.
-
-        topic: A single string, or list of strings that are the subscription
-               topics to unsubscribe from.
-
-        Returns a tuple (result, mid), where result is MQTT_ERR_SUCCESS
-        to indicate success or (MQTT_ERR_NO_CONN, None) if the client is not
-        currently connected.
-        mid is the message ID for the unsubscribe request. The mid value can be
-        used to track the unsubscribe request by checking against the mid
-        argument in the on_unsubscribe() callback if it is defined.
-
-        Raises a ValueError if topic is None or has zero string length, or is
-        not a string or list.
-        """
+        """Unsubscribe the client from one or more topics."""
         topic_list = None
         if topic is None:
             raise ValueError('Invalid topic.')
@@ -891,13 +578,7 @@ class Client(object):
         return self._send_unsubscribe(False, topic_list)
 
     def loop_read(self, max_packets=1):
-        """Process read network events. Use in place of calling loop() if you
-        wish to handle your client reads as part of your own application.
-
-        Use socket() to obtain the client socket to call select() or equivalent
-        on.
-
-        Do not use if you are using the threaded interface loop_start()."""
+        """Process read network events. """
         print("loop_read")
         if self._sock is None and self._ssl is None:
             return MQTT_ERR_NO_CONN
@@ -915,15 +596,7 @@ class Client(object):
         return MQTT_ERR_SUCCESS
 
     def loop_write(self, max_packets=1):
-        """Process read network events. Use in place of calling loop() if you
-        wish to handle your client reads as part of your own application.
-
-        Use socket() to obtain the client socket to call select() or equivalent
-        on.
-
-        Use want_write() to determine if there is data waiting to be written.
-
-        Do not use if you are using the threaded interface loop_start()."""
+        """Process write network events.""" 
         print("loop_write")
         if self._sock is None and self._ssl is None:
             return MQTT_ERR_NO_CONN
@@ -941,10 +614,7 @@ class Client(object):
         return MQTT_ERR_SUCCESS
 
     def loop_misc(self):
-        """Process miscellaneous network events. Use in place of calling loop() if you
-        wish to call select() or equivalent on.
-
-        Do not use if you are using the threaded interface loop_start()."""
+        """Process miscellaneous network events.""" 
         print("loop_misc")
         if self._sock is None: # and self._ssl is None:
             return MQTT_ERR_NO_CONN
@@ -1605,25 +1275,6 @@ class Client(object):
             self._easy_log(MQTT_LOG_ERR, "Error: Unrecognised command "+str(cmd))
             return MQTT_ERR_PROTOCOL
 
-    #def _handle_pingreq(self):
-    #    if self._strict_protocol:
-    #        if self._in_packet['remaining_length'] != 0:
-    #            return MQTT_ERR_PROTOCOL
-
-    #    self._easy_log(MQTT_LOG_DEBUG, "Received PINGREQ")
-    #    return self._send_pingresp()
-
-    #def _handle_pingresp(self):
-    #    print("_handle_pingresp")
-    #    if self._strict_protocol:
-    #        if self._in_packet['remaining_length'] != 0:
-    #            return MQTT_ERR_PROTOCOL
-
-    #    # No longer waiting for a PINGRESP.
-    #    self._ping_t = 0
-    #    self._easy_log(MQTT_LOG_DEBUG, "Received PINGRESP")
-    #    return MQTT_ERR_SUCCESS
-
     def _handle_connack(self):
         print("_handle_connack") #needed
         if self._strict_protocol:
@@ -1647,14 +1298,6 @@ class Client(object):
         if self.on_connect:
             self._in_callback = True
 
-            #argcount = self.on_connect.__code__.co_argcount
-
-            #if argcount == 3:
-            #    self.on_connect(self, self._userdata, result)
-            #else:
-            #    flags_dict = dict()
-            #    flags_dict['session present'] = flags & 0x01
-            #    self.on_connect(self, self._userdata, flags_dict, result)
             flags_dict = dict()
             flags_dict['session present'] = flags & 0x01
             self.on_connect(self, self._userdata, flags_dict, result)

@@ -19,13 +19,12 @@ protocol that is easy to implement and suitable for low powered devices.
 import errno
 import sys
 try:
-    import uselect as select
-    import usocket as socket
+    import select
+    #import usocket as socket
+    import socket
     import ustruct as struct
     import utime as time
 except:
-    import select
-    import socket
     import struct
     import time
 #FIXME
@@ -515,11 +514,7 @@ class Client(object):
         # Put messages in progress in a valid state.
         self._messages_reconnect_reset()
 
-        #sock = socket.create_connection((self._host, self._port), source_address=(self._bind_address, 0))
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((self._host, self._port))
-        #sock.listen(1)
-
+        sock = socket.create_connection((self._host, self._port), source_address=(self._bind_address, 0))
         self._sock = sock
         self._sock.setblocking(0)
 
@@ -527,7 +522,7 @@ class Client(object):
 
         return self._send_connect(self._keepalive, self._clean_session)
 
-    def loop(self, timeout=1.0, max_packets=1):
+    def xxxloop(self, timeout=1.0, max_packets=1):
         """Process network events.
 
         This function must be called regularly to ensure communication with the
@@ -588,6 +583,88 @@ class Client(object):
             rc = self.loop_write(max_packets)
             if rc or (self._sock is None):
                 return rc
+        return self.loop_misc()
+
+    def loop(self, timeout=1.0, max_packets=1):
+        """Process network events.
+
+        This function must be called regularly to ensure communication with the
+        broker is carried out. It calls select() on the network socket to wait
+        for network events. If incoming data is present it will then be
+        processed. Outgoing commands, from e.g. publish(), are normally sent
+        immediately that their function is called, but this is not always
+        possible. loop() will also attempt to send any remaining outgoing
+        messages, which also includes commands that are part of the flow for
+        messages with QoS>0.
+
+        timeout: The time in seconds to wait for incoming/outgoing network
+          traffic before timing out and returning.
+        max_packets: Not currently used.
+
+        Returns MQTT_ERR_SUCCESS on success.
+        Returns >0 on error.
+
+        A ValueError will be raised if timeout < 0"""
+        print("loop")
+        if timeout < 0.0:
+            raise ValueError('Invalid timeout.')
+
+        print("self._current_out_packet =", self._current_out_packet)
+        print("self._out_packet =", self._out_packet)
+        if self._current_out_packet is None and len(self._out_packet) > 0:
+            self._current_out_packet = self._out_packet.pop(0)
+        print("self._current_out_packet =", self._current_out_packet)
+        if self._current_out_packet:
+            wlist = [self.socket()]
+        else:
+            wlist = []
+
+        # sockpairR is used to break out of select() before the timeout, on a
+        # call to publish() etc.
+        #rlist = [self.socket(), self._sockpairR]
+        #rlist = [self.socket()]
+        #print("rlist =",rlist)
+        #print("wlist =", wlist)
+
+        ep = select.epoll()
+        print(self.socket())
+        fileno = self.socket().fileno()
+        #print("fileno =", self.socket().fileno())
+        #ep.register(self.socket().fileno(), select.EPOLLIN)
+        ep.register(fileno, select.EPOLLIN)
+        res = ep.poll(self.socket().fileno())
+        print("res = ", res)
+        f,x = res[0] if res else (0,0)
+        if f==fileno:
+            rc = self.loop_read(max_packets)
+            if rc or (self._sock is None):
+                return rc
+
+        ep = select.epoll()
+        print(self.socket())
+        fileno = self.socket().fileno()
+        #print("fileno =", self.socket().fileno())
+        #ep.register(self.socket().fileno(), select.EPOLLIN)
+        ep.register(fileno, select.EPOLLOUT)
+        res = ep.poll(self.socket().fileno())
+        print("res = ", res)
+        f,x = res[0] if res else (0,0)
+        if f==fileno:
+            rc = self.loop_write(max_packets)
+            if rc or (self._sock is None):
+                return rc
+        #except:
+            #return MQTT_ERR_UNKNOWN
+        #print("socklist =",socklist)
+        #if self.socket() in socklist[0]:
+        #    rc = self.loop_read(max_packets)
+        #    if rc or (self._sock is None):
+        #        return rc
+
+        #if self.socket() in socklist[1]:
+        #    rc = self.loop_write(max_packets)
+        #    if rc or (self._sock is None):
+        #        return rc
         return self.loop_misc()
 
 #    def publish(self, topic, payload=None, qos=0, retain=False):
@@ -1570,14 +1647,17 @@ class Client(object):
         if self.on_connect:
             self._in_callback = True
 
-            argcount = self.on_connect.__code__.co_argcount
+            #argcount = self.on_connect.__code__.co_argcount
 
-            if argcount == 3:
-                self.on_connect(self, self._userdata, result)
-            else:
-                flags_dict = dict()
-                flags_dict['session present'] = flags & 0x01
-                self.on_connect(self, self._userdata, flags_dict, result)
+            #if argcount == 3:
+            #    self.on_connect(self, self._userdata, result)
+            #else:
+            #    flags_dict = dict()
+            #    flags_dict['session present'] = flags & 0x01
+            #    self.on_connect(self, self._userdata, flags_dict, result)
+            flags_dict = dict()
+            flags_dict['session present'] = flags & 0x01
+            self.on_connect(self, self._userdata, flags_dict, result)
             self._in_callback = False
         if result == 0:
             rc = 0

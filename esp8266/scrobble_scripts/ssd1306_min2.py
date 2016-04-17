@@ -111,7 +111,7 @@ class SSD1306:
     def poweron(self):
         pass
 
-    def draw_text(self, x, y, string) #, size=1, space=1):
+    def draw_text(self, x, y, string): #, size=1, space=1):
         def pixel_x(char_number, char_column):
             char_offset = x + char_number * font.cols + char_number
             pixel_offset = char_offset + char_column + 1

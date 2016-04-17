@@ -129,7 +129,7 @@ class SSD1306:
          (pixel_x(char_number, char_column),
           pixel_y(char_row))#,
           #pixel_mask(char, char_column, char_row))
-          for char_number range(len(string))
+          for char_number in range(len(string))
           for char_column in range(font.cols)
           for char_row in range(font.rows))
           #for point_column in range(1)

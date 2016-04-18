@@ -86,7 +86,7 @@ class SSD1306:
     def fill(self, col):
         self.framebuf.fill(col)
 
-    def pixel(self, x, y, col):
+    def pixel(self, x, y, col=1):
         self.framebuf.pixel(x, y, col)
 
     def scroll(self, dx, dy):

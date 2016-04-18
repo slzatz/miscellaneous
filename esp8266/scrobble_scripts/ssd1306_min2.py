@@ -121,15 +121,15 @@ class SSD1306:
             char_offset = y + char_row 
             return char_offset 
 
-    #def pixel_mask(char, char_column, char_row):
-    #  char_index_offset = (ord(char)-32) * font.cols
-    #  return font.bytes[char_index_offset + char_column] >> char_row & 0x1
+    def pixel_mask(char, char_column, char_row):
+      char_index_offset = (ord(char)-32) * font.cols
+      return font.bytes[char_index_offset + char_column] >> char_row & 0x1
 
         pixels = (
          (pixel_x(char_number, char_column),
-          pixel_y(char_row))#,
-          #pixel_mask(char, char_column, char_row))
-          for char_number in range(len(string))
+          pixel_y(char_row),
+          pixel_mask(char, char_column, char_row))
+          for char_number, char in enumerate(string)
           for char_column in range(font.cols)
           for char_row in range(font.rows))
           #for point_column in range(1)

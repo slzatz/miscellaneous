@@ -1,4 +1,4 @@
-import umqtt2 as mqtt
+import umqtt3 as mqtt
 
 import utime as time
 

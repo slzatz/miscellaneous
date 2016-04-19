@@ -920,7 +920,9 @@ class Client(object):
     def _packet_handle(self):
         print("_packet_handle")
         cmd = self._in_packet['command']&0xF0
-        if cmd == CONNACK:
+        if cmd == PUBLISH: #appear to need PUBLISH
+            return self._handle_publish()
+        elif cmd == CONNACK:
             return self._handle_connack()
         elif cmd == SUBACK:
             return self._handle_suback()
@@ -1016,6 +1018,57 @@ class Client(object):
             self._in_callback = False
 
         return MQTT_ERR_SUCCESS
+
+    def _handle_publish(self):
+        rc = 0
+        print("_handle_publish") #needed after packet_handle
+        header = self._in_packet['command']
+        message = MQTTMessage()
+        message.dup = (header & 0x08)>>3
+        message.qos = (header & 0x06)>>1
+        message.retain = (header & 0x01)
+
+        pack_format = "!H" + str(len(self._in_packet['packet'])-2) + 's'
+        (slen, packet) = struct.unpack(pack_format, self._in_packet['packet'])
+        pack_format = '!' + str(slen) + 's' + str(len(packet)-slen) + 's'
+        (message.topic, packet) = struct.unpack(pack_format, packet)
+
+        if len(message.topic) == 0:
+            return MQTT_ERR_PROTOCOL
+
+        if sys.version_info[0] >= 3:
+            message.topic = message.topic.decode('utf-8')
+
+        if message.qos > 0:
+            pack_format = "!H" + str(len(packet)-2) + 's'
+            (message.mid, packet) = struct.unpack(pack_format, packet)
+
+        message.payload = packet
+
+        self._easy_log(
+            MQTT_LOG_DEBUG,
+            "Received PUBLISH (d"+str(message.dup)+
+            ", q"+str(message.qos)+", r"+str(message.retain)+
+            ", m"+str(message.mid)+", '"+message.topic+
+            "', ...  ("+str(len(message.payload))+" bytes)")
+
+        message.timestamp = time.time()
+        if message.qos == 0:
+            self._handle_on_message(message)
+            return MQTT_ERR_SUCCESS
+        elif message.qos == 1:
+            rc = self._send_puback(message.mid)
+            self._handle_on_message(message)
+            return rc
+        elif message.qos == 2:
+            rc = self._send_pubrec(message.mid)
+            message.state = mqtt_ms_wait_for_pubrel
+            self._in_message_mutex.acquire()
+            self._in_messages.append(message)
+            self._in_message_mutex.release()
+            return rc
+        else:
+            return MQTT_ERR_PROTOCOL
 
     def _update_inflight(self):
         # Dont lock message_mutex here

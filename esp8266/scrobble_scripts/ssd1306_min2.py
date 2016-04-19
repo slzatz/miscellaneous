@@ -122,6 +122,7 @@ class SSD1306:
             return char_offset 
 
     def pixel_mask(char, char_column, char_row):
+      # To save space, eliminated first 32 non-printing chars
       char_index_offset = (ord(char)-32) * font.cols
       return font.bytes[char_index_offset + char_column] >> char_row & 0x1
 

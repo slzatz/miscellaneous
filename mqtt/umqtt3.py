@@ -358,7 +358,7 @@ class Client(object):
 
         return self._send_connect(self._keepalive, self._clean_session)
 
-    def loop(self, timeout=1.0):
+    def loop(self, timeout=1):
         """Process network events.
         """
         print("loop")
@@ -373,12 +373,12 @@ class Client(object):
         print("events = ", events)
         for fileno, ev in events:
             if ev & select.EPOLLIN:
-                rc = self.loop_read(1)
+                rc = self.loop_read()
                 if rc or (self._sock is None):
                     return rc
 
             if ev & select.EPOLLOUT and self._current_out_packet:
-                rc = self.loop_write(1)
+                rc = self.loop_write()
                 if rc or (self._sock is None):
                     return rc
 
@@ -429,7 +429,7 @@ class Client(object):
     def loop_read(self):
         """Process read network events. """
         print("loop_read")
-        if self._sock is None and self._ssl is None:
+        if self._sock is None:
             return MQTT_ERR_NO_CONN
 
         max_packets = len(self._out_messages) + len(self._in_messages)
@@ -447,7 +447,7 @@ class Client(object):
     def loop_write(self):
         """Process write network events.""" 
         print("loop_write")
-        if self._sock is None and self._ssl is None:
+        if self._sock is None:
             return MQTT_ERR_NO_CONN
 
         max_packets = len(self._out_packet) + 1
@@ -465,7 +465,7 @@ class Client(object):
     def loop_misc(self):
         """Process miscellaneous network events.""" 
         print("loop_misc")
-        if self._sock is None: # and self._ssl is None:
+        if self._sock is None:
             return MQTT_ERR_NO_CONN
 
         now = time.time()
@@ -507,10 +507,7 @@ class Client(object):
 
     def _loop_rc_handle(self, rc):
         if rc:
-            if self._ssl:
-                self._ssl.close()
-                self._ssl = None
-            elif self._sock:
+            if self._sock:
                 self._sock.close()
                 self._sock = None
 
@@ -653,7 +650,7 @@ class Client(object):
         now = time.time()
         last_msg_out = self._last_msg_out
         last_msg_in = self._last_msg_in
-        if (self._sock is not None or self._ssl is not None) and (now - last_msg_out >= self._keepalive or now - last_msg_in >= self._keepalive):
+        if (self._sock is not None) and (now - last_msg_out >= self._keepalive or now - last_msg_in >= self._keepalive):
             if self._state == mqtt_cs_connected and self._ping_t == 0:
                 self._send_pingreq()
                 self._last_msg_out = now
@@ -705,7 +702,7 @@ class Client(object):
             raise TypeError
 
     def _send_publish(self, mid, topic, payload=None, qos=0, retain=False, dup=False):
-        if self._sock is None and self._ssl is None:
+        if self._sock is None:
             return MQTT_ERR_NO_CONN
 
         utopic = topic.encode('utf-8')
@@ -714,7 +711,6 @@ class Client(object):
         packet.extend(struct.pack("!B", command))
         if payload is None:
             remaining_length = 2+len(utopic)
-            self._easy_log(MQTT_LOG_DEBUG, "Sending PUBLISH (d"+str(dup)+", q"+str(qos)+", r"+str(int(retain))+", m"+str(mid)+", '"+topic+"' (NULL payload)")
         else:
             if isinstance(payload, str):
                 upayload = payload.encode('utf-8')
@@ -726,7 +722,6 @@ class Client(object):
                 payloadlen = len(upayload)
 
             remaining_length = 2+len(utopic) + payloadlen
-            self._easy_log(MQTT_LOG_DEBUG, "Sending PUBLISH (d"+str(dup)+", q"+str(qos)+", r"+str(int(retain))+", m"+str(mid)+", '"+topic+"', ... ("+str(payloadlen)+" bytes)")
 
         if qos > 0:
             # For message id
@@ -754,11 +749,9 @@ class Client(object):
         return self._packet_queue(PUBLISH, packet, mid, qos)
 
     def _send_pubrec(self, mid):
-        self._easy_log(MQTT_LOG_DEBUG, "Sending PUBREC (Mid: "+str(mid)+")")
         return self._send_command_with_mid(PUBREC, mid, False)
 
     def _send_pubrel(self, mid, dup=False):
-        self._easy_log(MQTT_LOG_DEBUG, "Sending PUBREL (Mid: "+str(mid)+")")
         return self._send_command_with_mid(PUBREL|2, mid, dup)
 
     def _send_command_with_mid(self, command, mid, dup):
@@ -939,7 +932,6 @@ class Client(object):
 
         (flags, result) = struct.unpack("!BB", self._in_packet['packet'])
         if result == CONNACK_REFUSED_PROTOCOL_VERSION and self._protocol == MQTTv311:
-            self._easy_log(MQTT_LOG_DEBUG, "Received CONNACK ("+str(flags)+", "+str(result)+"), attempting downgrade to MQTT v3.1.")
             # Downgrade to MQTT v3.1
             self._protocol = MQTTv31
             return self.reconnect()
@@ -947,7 +939,6 @@ class Client(object):
         if result == 0:
             self._state = mqtt_cs_connected
 
-        self._easy_log(MQTT_LOG_DEBUG, "Received CONNACK ("+str(flags)+", "+str(result)+")")
         if self.on_connect:
             self._in_callback = True
 
@@ -1004,7 +995,6 @@ class Client(object):
 
     def _handle_suback(self):
         print("_handle_suback") #needed after _packet_handle
-        self._easy_log(MQTT_LOG_DEBUG, "Received SUBACK")
         pack_format = "!H" + str(len(self._in_packet['packet'])-2) + 's'
         (mid, packet) = struct.unpack(pack_format, self._in_packet['packet'])
         pack_format = "!" + "B"*len(packet)
@@ -1041,7 +1031,6 @@ class Client(object):
 
         mid = struct.unpack("!H", self._in_packet['packet'])
         mid = mid[0]
-        self._easy_log(MQTT_LOG_DEBUG, "Received PUBREC (Mid: "+str(mid)+")")
 
         for m in self._out_messages:
             if m.mid == mid:
@@ -1058,7 +1047,6 @@ class Client(object):
 
         mid = struct.unpack("!H", self._in_packet['packet'])
         mid = mid[0]
-        self._easy_log(MQTT_LOG_DEBUG, "Received "+cmd+" (Mid: "+str(mid)+")")
 
         for i in range(len(self._out_messages)):
             try:

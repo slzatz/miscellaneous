@@ -1035,13 +1035,6 @@ class Client(object):
 
         message.payload = packet
 
-        self._easy_log(
-            MQTT_LOG_DEBUG,
-            "Received PUBLISH (d"+str(message.dup)+
-            ", q"+str(message.qos)+", r"+str(message.retain)+
-            ", m"+str(message.mid)+", '"+message.topic+
-            "', ...  ("+str(len(message.payload))+" bytes)")
-
         message.timestamp = time.time()
         if message.qos == 0:
             self._handle_on_message(message)

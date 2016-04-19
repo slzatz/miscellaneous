@@ -3,9 +3,12 @@ import socket
 import json
 import network
 from config import host, ssid, pw
-from ssd1306_min import SSD1306 as ssd
+from ssd1306_min import SSD1306 as SSD
+from machine import Pin, I2C
 
-d = ssd()
+i2c = I2C(scl=Pin(5), sda=Pin(4), freq=400000)
+
+d = SSD(i2c)
 d.init_display()
 d.draw_text(0, 0, "HELLO STEVE")
 d.display()

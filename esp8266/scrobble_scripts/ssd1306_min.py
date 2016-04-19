@@ -141,5 +141,5 @@ class SSD1306:
               for char_row in range(font.rows)
               )
 
-    for pixl in pixels:
-      self.pixel(*pixl)
+    for pixel in pixels:
+      self.set_pixel(*pixel)

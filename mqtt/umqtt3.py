@@ -58,82 +58,16 @@ mqtt_ms_wait_for_puback = 2
 mqtt_ms_wait_for_pubrec = 3
 mqtt_ms_resend_pubrel = 4
 mqtt_ms_wait_for_pubrel = 5
-mqtt_ms_resend_pubcomp = 6
 mqtt_ms_wait_for_pubcomp = 7
-mqtt_ms_send_pubrec = 8
 mqtt_ms_queued = 9
 
 # Error values
 MQTT_ERR_AGAIN = -1
 MQTT_ERR_SUCCESS = 0
-MQTT_ERR_NOMEM = 1
 MQTT_ERR_PROTOCOL = 2
-MQTT_ERR_INVAL = 3
 MQTT_ERR_NO_CONN = 4
 MQTT_ERR_CONN_REFUSED = 5
-MQTT_ERR_NOT_FOUND = 6
 MQTT_ERR_CONN_LOST = 7
-MQTT_ERR_TLS = 8
-MQTT_ERR_PAYLOAD_SIZE = 9
-MQTT_ERR_NOT_SUPPORTED = 10
-MQTT_ERR_AUTH = 11
-MQTT_ERR_ACL_DENIED = 12
-MQTT_ERR_UNKNOWN = 13
-MQTT_ERR_ERRNO = 14
-
-sockpair_data = b"0"
-
-def error_string(mqtt_errno):
-    """Return the error string associated with an mqtt error number."""
-    if mqtt_errno == MQTT_ERR_SUCCESS:
-        return "No error."
-    elif mqtt_errno == MQTT_ERR_NOMEM:
-        return "Out of memory."
-    elif mqtt_errno == MQTT_ERR_PROTOCOL:
-        return "A network protocol error occurred when communicating with the broker."
-    elif mqtt_errno == MQTT_ERR_INVAL:
-        return "Invalid function arguments provided."
-    elif mqtt_errno == MQTT_ERR_NO_CONN:
-        return "The client is not currently connected."
-    elif mqtt_errno == MQTT_ERR_CONN_REFUSED:
-        return "The connection was refused."
-    elif mqtt_errno == MQTT_ERR_NOT_FOUND:
-        return "Message not found (internal error)."
-    elif mqtt_errno == MQTT_ERR_CONN_LOST:
-        return "The connection was lost."
-    elif mqtt_errno == MQTT_ERR_TLS:
-        return "A TLS error occurred."
-    elif mqtt_errno == MQTT_ERR_PAYLOAD_SIZE:
-        return "Payload too large."
-    elif mqtt_errno == MQTT_ERR_NOT_SUPPORTED:
-        return "This feature is not supported."
-    elif mqtt_errno == MQTT_ERR_AUTH:
-        return "Authorisation failed."
-    elif mqtt_errno == MQTT_ERR_ACL_DENIED:
-        return "Access denied by ACL."
-    elif mqtt_errno == MQTT_ERR_UNKNOWN:
-        return "Unknown error."
-    elif mqtt_errno == MQTT_ERR_ERRNO:
-        return "Error defined by errno."
-    else:
-        return "Unknown error."
-
-def connack_string(connack_code):
-    """Return the string associated with a CONNACK result."""
-    if connack_code == 0:
-        return "Connection Accepted."
-    elif connack_code == 1:
-        return "Connection Refused: unacceptable protocol version."
-    elif connack_code == 2:
-        return "Connection Refused: identifier rejected."
-    elif connack_code == 3:
-        return "Connection Refused: broker unavailable."
-    elif connack_code == 4:
-        return "Connection Refused: bad user name or password."
-    elif connack_code == 5:
-        return "Connection Refused: not authorised."
-    else:
-        return "Connection Refused: unknown reason."
 
 def topic_matches_sub(sub, topic):
     """Check whether a topic matches a subscription.  """
@@ -261,13 +195,6 @@ class Client(object):
     def __del__(self):
         pass
 
-    def reinitialise(self, client_id="", clean_session=True, userdata=None):
-        if self._sock:
-            self._sock.close()
-            self._sock = None
-
-        self.__init__(client_id, clean_session, userdata)
-
     def connect(self, host, port=1883, keepalive=60, bind_address=""):
         """Connect to a remote broker.
         """
@@ -368,15 +295,6 @@ class Client(object):
 
         return self.loop_misc()
 
-    def disconnect(self):
-        """Disconnect a connected client from the broker."""
-        self._state = mqtt_cs_disconnecting
-
-        if self._sock is None:
-            return MQTT_ERR_NO_CONN
-
-        return self._send_disconnect()
-
     def subscribe(self, topic, qos=0):
         """Subscribe the client to one or more topics."""
         print("subscribe")
@@ -476,14 +394,6 @@ class Client(object):
                 self._in_callback = False
             return MQTT_ERR_CONN_LOST
         return MQTT_ERR_SUCCESS
-
-    def user_data_set(self, userdata):
-        """Set the user data variable passed to callbacks. May be any data type."""
-        self._userdata = userdata
-
-    def socket(self):
-        """Return the socket or ssl object for this client."""
-        return self._sock
 
     # ============================================================
     # Private functions
@@ -732,21 +642,6 @@ class Client(object):
 
         return self._packet_queue(PUBLISH, packet, mid, qos)
 
-    def _send_command_with_mid(self, command, mid, dup):
-        # For PUBACK, PUBCOMP, PUBREC, and PUBREL
-        if dup:
-            command = command | 8
-
-        remaining_length = 2
-        packet = struct.pack('!BBH', command, remaining_length, mid)
-        return self._packet_queue(command, packet, mid, 1)
-
-    def _send_simple_command(self, command):
-        # For DISCONNECT, PINGREQ and PINGRESP
-        remaining_length = 0
-        packet = struct.pack('!BB', command, remaining_length)
-        return self._packet_queue(command, packet, 0, 0)
-
     def _send_connect(self, keepalive, clean_session):
         print("_send_connect")
         if self._protocol == MQTTv31:
@@ -784,9 +679,6 @@ class Client(object):
 
         self._keepalive = keepalive
         return self._packet_queue(command, packet, 0, 0)
-
-    def _send_disconnect(self):
-        return self._send_simple_command(DISCONNECT)
 
     def _send_subscribe(self, dup, topics):
         print("_send_subscribe")
@@ -1030,70 +922,6 @@ class Client(object):
             return rc
         else:
             return MQTT_ERR_PROTOCOL
-
-    def _update_inflight(self):
-        # Dont lock message_mutex here
-        for m in self._out_messages:
-            if self._inflight_messages < self._max_inflight_messages:
-                if m.qos > 0 and m.state == mqtt_ms_queued:
-                    self._inflight_messages = self._inflight_messages + 1
-                    if m.qos == 1:
-                        m.state = mqtt_ms_wait_for_puback
-                    elif m.qos == 2:
-                        m.state = mqtt_ms_wait_for_pubrec
-                    rc = self._send_publish(m.mid, m.topic, m.payload, m.qos, m.retain, m.dup)
-                    if rc != 0:
-                        return rc
-            else:
-                return MQTT_ERR_SUCCESS
-        return MQTT_ERR_SUCCESS
-
-    def _handle_pubrec(self):
-        if self._strict_protocol:
-            if self._in_packet['remaining_length'] != 2:
-                return MQTT_ERR_PROTOCOL
-
-        mid = struct.unpack("!H", self._in_packet['packet'])
-        mid = mid[0]
-
-        for m in self._out_messages:
-            if m.mid == mid:
-                m.state = mqtt_ms_wait_for_pubcomp
-                m.timestamp = time.time()
-                return self._send_pubrel(mid, False)
-
-        return MQTT_ERR_SUCCESS
-
-    def _handle_pubackcomp(self, cmd):
-        if self._strict_protocol:
-            if self._in_packet['remaining_length'] != 2:
-                return MQTT_ERR_PROTOCOL
-
-        mid = struct.unpack("!H", self._in_packet['packet'])
-        mid = mid[0]
-
-        for i in range(len(self._out_messages)):
-            try:
-                if self._out_messages[i].mid == mid:
-                    # Only inform the client the message has been sent once.
-                    if self.on_publish:
-                        self._in_callback = True
-                        self.on_publish(self, self._userdata, mid)
-                        self._in_callback = False
-
-                    self._out_messages.pop(i)
-                    self._inflight_messages = self._inflight_messages - 1
-                    if self._max_inflight_messages > 0:
-                        rc = self._update_inflight()
-                        if rc != MQTT_ERR_SUCCESS:
-                            return rc
-                    return MQTT_ERR_SUCCESS
-            except IndexError:
-                # Have removed item so i>count.
-                # Not really an error.
-                pass
-
-        return MQTT_ERR_SUCCESS
 
     def _handle_on_message(self, message):
         matched = False

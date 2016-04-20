@@ -617,16 +617,16 @@ class Client(object):
 
             remaining_length = 2+len(utopic) + payloadlen
 
-        if qos > 0:
+        #if qos > 0:
             # For message id
-            remaining_length = remaining_length + 2
+            #remaining_length = remaining_length + 2
 
         self._pack_remaining_length(packet, remaining_length)
         self._pack_str16(packet, topic)
 
-        if qos > 0:
+        #if qos > 0:
             # For message id
-            packet.extend(struct.pack("!H", mid))
+            #packet.extend(struct.pack("!H", mid))
 
         if payload is not None:
             if isinstance(payload, str):
@@ -899,9 +899,9 @@ class Client(object):
 
         message.topic = message.topic.decode('utf-8')
 
-        if message.qos > 0:
-            pack_format = "!H" + str(len(packet)-2) + 's'
-            (message.mid, packet) = struct.unpack(pack_format, packet)
+        #if message.qos > 0:
+        #    pack_format = "!H" + str(len(packet)-2) + 's'
+        #    (message.mid, packet) = struct.unpack(pack_format, packet)
 
         message.payload = packet
 
@@ -909,17 +909,17 @@ class Client(object):
         if message.qos == 0:
             self._handle_on_message(message)
             return MQTT_ERR_SUCCESS
-        elif message.qos == 1:
-            rc = self._send_puback(message.mid)
-            self._handle_on_message(message)
-            return rc
-        elif message.qos == 2:
-            rc = self._send_pubrec(message.mid)
-            message.state = mqtt_ms_wait_for_pubrel
-            self._in_message_mutex.acquire()
-            self._in_messages.append(message)
-            self._in_message_mutex.release()
-            return rc
+        #elif message.qos == 1:
+        #    rc = self._send_puback(message.mid)
+        #    self._handle_on_message(message)
+        #    return rc
+        #elif message.qos == 2:
+        #    rc = self._send_pubrec(message.mid)
+        #    message.state = mqtt_ms_wait_for_pubrel
+        #    self._in_message_mutex.acquire()
+        #    self._in_messages.append(message)
+        #    self._in_message_mutex.release()
+        #    return rc
         else:
             return MQTT_ERR_PROTOCOL
 

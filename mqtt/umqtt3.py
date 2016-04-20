@@ -26,40 +26,24 @@ import utime as time
 
 EAGAIN = errno.EAGAIN
 
-MQTTv31 = 3
-MQTTv311 = 4
+MQTTv31 = const(3)
+MQTTv311 = const(4)
 
 PROTOCOL_NAMEv31 = b"MQIsdp"
 PROTOCOL_NAMEv311 = b"MQTT"
 
-PROTOCOL_VERSION = 3
+PROTOCOL_VERSION = const(3)
 
 # Message types
-CONNECT = 0x10
-CONNACK = 0x20
-PUBLISH = 0x30
-PUBACK = 0x40
-PUBREC = 0x50
-PUBREL = 0x60
-PUBCOMP = 0x70
-SUBSCRIBE = 0x80
-SUBACK = 0x90
-DISCONNECT = 0xE0
-
-# Log levels
-MQTT_LOG_INFO = 0x01
-MQTT_LOG_NOTICE = 0x02
-MQTT_LOG_WARNING = 0x04
-MQTT_LOG_ERR = 0x08
-MQTT_LOG_DEBUG = 0x10
+CONNECT = const(0x10)
+CONNACK = const(0x20)
+PUBLISH = const(0x30)
+SUBSCRIBE = const(0x80)
+SUBACK = const(0x90)
+DISCONNECT = const(0xE0)
 
 # CONNACK codes
-CONNACK_ACCEPTED = 0
 CONNACK_REFUSED_PROTOCOL_VERSION = 1
-CONNACK_REFUSED_IDENTIFIER_REJECTED = 2
-CONNACK_REFUSED_SERVER_UNAVAILABLE = 3
-CONNACK_REFUSED_BAD_USERNAME_PASSWORD = 4
-CONNACK_REFUSED_NOT_AUTHORIZED = 5
 
 # Connection state
 mqtt_cs_new = 0
@@ -747,12 +731,6 @@ class Client(object):
                 raise TypeError('payload must be a string, unicode or a bytearray.')
 
         return self._packet_queue(PUBLISH, packet, mid, qos)
-
-    def _send_pubrec(self, mid):
-        return self._send_command_with_mid(PUBREC, mid, False)
-
-    def _send_pubrel(self, mid, dup=False):
-        return self._send_command_with_mid(PUBREL|2, mid, dup)
 
     def _send_command_with_mid(self, command, mid, dup):
         # For PUBACK, PUBCOMP, PUBREC, and PUBREL

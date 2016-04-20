@@ -600,7 +600,7 @@ class Client(object):
             return MQTT_ERR_NO_CONN
 
         utopic = topic.encode('utf-8')
-        command = PUBLISH | ((dup&0x1)<<3) | (qos<<1) | retain
+        command = PUBLISH # | ((dup&0x1)<<3) | (qos<<1) | retain
         packet = bytearray()
         packet.extend(struct.pack("!B", command))
         if payload is None:
@@ -818,6 +818,7 @@ class Client(object):
             flags_dict['session present'] = flags & 0x01
             self.on_connect(self, self._userdata, flags_dict, result)
             self._in_callback = False
+
         if result == 0:
             rc = 0
             for m in self._out_messages:
@@ -896,8 +897,7 @@ class Client(object):
         if len(message.topic) == 0:
             return MQTT_ERR_PROTOCOL
 
-        if sys.version_info[0] >= 3:
-            message.topic = message.topic.decode('utf-8')
+        message.topic = message.topic.decode('utf-8')
 
         if message.qos > 0:
             pack_format = "!H" + str(len(packet)-2) + 's'

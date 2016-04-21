@@ -17,14 +17,12 @@
 This is an MQTT v3.1 client module. MQTT is a lightweight pub/sub messaging
 protocol that is easy to implement and suitable for low powered devices.
 """
-import errno
-import sys
 import select
 import socket
 import ustruct as struct
 import utime as time
 
-EAGAIN = errno.EAGAIN
+EAGAIN = const(11)
 
 MQTTv31 = const(3)
 MQTTv311 = const(4)
@@ -71,6 +69,7 @@ MQTT_ERR_CONN_LOST = 7
 
 def topic_matches_sub(sub, topic):
     """Check whether a topic matches a subscription.  """
+    print("topic_matches_sub")
     result = True
     multilevel_wildcard = False
 
@@ -130,6 +129,7 @@ def topic_matches_sub(sub, topic):
 class MQTTMessage:
     """ This is a class that describes an incoming message."""
     def __init__(self):
+        print("MQTTMessage Class")
         self.timestamp = 0
         self.state = mqtt_ms_invalid
         self.dup = False
@@ -139,12 +139,12 @@ class MQTTMessage:
         self.qos = 0
         self.retain = False
 
-class Client(object):
+class Client:
     """MQTT version 3.1/3.1.1 client class."""
     def __init__(self, client_id="", clean_session=True, userdata=None, protocol=MQTTv31):
         if not clean_session and (client_id == "" or client_id is None):
             raise ValueError('A client id must be provided if clean session is False.')
-
+        print("Client Class")
         self._protocol = protocol
         self._userdata = userdata
         self._sock = None
@@ -193,6 +193,7 @@ class Client(object):
         self._strict_protocol = False
 
     def __del__(self):
+        print("__del__ Client")
         pass
 
     def connect(self, host, port=1883, keepalive=60, bind_address=""):
@@ -339,7 +340,7 @@ class Client(object):
             max_packets = 1
 
         for i in range(0, max_packets):
-            rc = self._packet_read()
+            rc = self._packet_read() #only call to _packet_read
             if rc > 0:
                 return self._loop_rc_handle(rc)
             elif rc == MQTT_ERR_AGAIN:
@@ -400,6 +401,7 @@ class Client(object):
     # ============================================================
 
     def _loop_rc_handle(self, rc):
+        print("_loop_rc_handle")
         if rc:
             if self._sock:
                 self._sock.close()
@@ -541,6 +543,7 @@ class Client(object):
         return MQTT_ERR_SUCCESS
 
     def _check_keepalive(self):
+        print("_check_keepalive")
         now = time.time()
         last_msg_out = self._last_msg_out
         last_msg_in = self._last_msg_in
@@ -564,12 +567,14 @@ class Client(object):
                     self._in_callback = False
 
     def _mid_generate(self):
+        print("_mid_generate")
         self._last_mid = self._last_mid + 1
         if self._last_mid == 65536:
             self._last_mid = 1
         return self._last_mid
 
     def _pack_remaining_length(self, packet, remaining_length):
+        print("_pack_remaining_length")
         remaining_bytes = []
         while True:
             byte = remaining_length % 128
@@ -585,6 +590,7 @@ class Client(object):
                 return packet
 
     def _pack_str16(self, packet, data):
+        print("_pack_str16")
         if isinstance(data, bytearray) or isinstance(data, bytes):
             packet.extend(struct.pack("!H", len(data)))
             packet.extend(data)
@@ -596,6 +602,7 @@ class Client(object):
             raise TypeError
 
     def _send_publish(self, mid, topic, payload=None, qos=0, retain=False, dup=False):
+        print("_send_publish")
         if self._sock is None:
             return MQTT_ERR_NO_CONN
 
@@ -924,6 +931,7 @@ class Client(object):
             return MQTT_ERR_PROTOCOL
 
     def _handle_on_message(self, message):
+        print("_handle_on_message")
         matched = False
         for t in self.on_message_filtered:
             if topic_matches_sub(t[0], message.topic):

@@ -67,65 +67,6 @@ MQTT_ERR_NO_CONN = 4
 MQTT_ERR_CONN_REFUSED = 5
 MQTT_ERR_CONN_LOST = 7
 
-#def topic_matches_sub(sub, topic):
-#    """Check whether a topic matches a subscription.  """
-#    print("topic_matches_sub")
-#    result = True
-#    multilevel_wildcard = False
-#
-#    slen = len(sub)
-#    tlen = len(topic)
-#
-#    if slen > 0 and tlen > 0:
-#        if (sub[0] == '$' and topic[0] != '$') or (topic[0] == '$' and sub[0] != '$'):
-#            return False
-#
-#    spos = 0
-#    tpos = 0
-#
-#    while spos < slen and tpos < tlen:
-#        if sub[spos] == topic[tpos]:
-#            if tpos == tlen-1:
-#                # Check for e.g. foo matching foo/#
-#                if spos == slen-3 and sub[spos+1] == '/' and sub[spos+2] == '#':
-#                    result = True
-#                    multilevel_wildcard = True
-#                    break
-#
-#            spos += 1
-#            tpos += 1
-#
-#            if tpos == tlen and spos == slen-1 and sub[spos] == '+':
-#                spos += 1
-#                result = True
-#                break
-#        else:
-#            if sub[spos] == '+':
-#                spos += 1
-#                while tpos < tlen and topic[tpos] != '/':
-#                    tpos += 1
-#                if tpos == tlen and spos == slen:
-#                    result = True
-#                    break
-#
-#            elif sub[spos] == '#':
-#                multilevel_wildcard = True
-#                if spos+1 != slen:
-#                    result = False
-#                    break
-#                else:
-#                    result = True
-#                    break
-#
-#            else:
-#                result = False
-#                break
-#
-#    if not multilevel_wildcard and (tpos < tlen or spos < slen):
-#        result = False
-#
-#    return result
-
 class MQTTMessage:
     """ This is a class that describes an incoming message."""
     def __init__(self):
@@ -400,22 +341,6 @@ class Client:
     # Private functions
     # ============================================================
 
-    #def _loop_rc_handle(self, rc):
-    #    print("_loop_rc_handle")
-    #    if rc:
-    #        if self._sock:
-    #            self._sock.close()
-    #            self._sock = None
-
-    #        if self._state == mqtt_cs_disconnecting:
-    #            rc = MQTT_ERR_SUCCESS
-    #        if self.on_disconnect:
-    #            self._in_callback = True
-    #            self.on_disconnect(self, self._userdata, rc)
-    #            self._in_callback = False
-
-    #    return rc
-
     def _packet_read(self):
         print("_packet_read")
         if self._in_packet['command'] == 0:
@@ -600,54 +525,6 @@ class Client:
             packet.extend(struct.pack(pack_format, len(udata), udata))
         else:
             raise TypeError
-
-    #def _send_publish(self, mid, topic, payload=None, qos=0, retain=False, dup=False):
-    #    print("_send_publish")
-    #    if self._sock is None:
-    #        return MQTT_ERR_NO_CONN
-
-    #    utopic = topic.encode('utf-8')
-    #    command = PUBLISH # | ((dup&0x1)<<3) | (qos<<1) | retain
-    #    packet = bytearray()
-    #    packet.extend(struct.pack("!B", command))
-    #    if payload is None:
-    #        remaining_length = 2+len(utopic)
-    #    else:
-    #        if isinstance(payload, str):
-    #            upayload = payload.encode('utf-8')
-    #            payloadlen = len(upayload)
-    #        elif isinstance(payload, bytearray):
-    #            payloadlen = len(payload)
-    #        elif isinstance(payload, unicode):
-    #            upayload = payload.encode('utf-8')
-    #            payloadlen = len(upayload)
-
-    #        remaining_length = 2+len(utopic) + payloadlen
-
-    #    #if qos > 0:
-    #        # For message id
-    #        #remaining_length = remaining_length + 2
-
-    #    self._pack_remaining_length(packet, remaining_length)
-    #    self._pack_str16(packet, topic)
-
-    #    #if qos > 0:
-    #        # For message id
-    #        #packet.extend(struct.pack("!H", mid))
-
-    #    if payload is not None:
-    #        if isinstance(payload, str):
-    #            pack_format = str(payloadlen) + "s"
-    #            packet.extend(struct.pack(pack_format, upayload))
-    #        elif isinstance(payload, bytearray):
-    #            packet.extend(payload)
-    #        elif isinstance(payload, unicode):
-    #            pack_format = str(payloadlen) + "s"
-    #            packet.extend(struct.pack(pack_format, upayload))
-    #        else:
-    #            raise TypeError('payload must be a string, unicode or a bytearray.')
-
-    #    return self._packet_queue(PUBLISH, packet, mid, qos)
 
     def _send_connect(self, keepalive, clean_session):
         print("_send_connect")

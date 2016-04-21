@@ -873,19 +873,19 @@ class Client:
         else:
             return MQTT_ERR_PROTOCOL
 
-    #def _handle_suback(self):
-    #    print("_handle_suback") #needed after _packet_handle
-    #    pack_format = "!H" + str(len(self._in_packet['packet'])-2) + 's'
-    #    (mid, packet) = struct.unpack(pack_format, self._in_packet['packet'])
-    #    pack_format = "!" + "B"*len(packet)
-    #    granted_qos = struct.unpack(pack_format, packet)
+    def _handle_suback(self):
+        print("_handle_suback") #needed after _packet_handle
+        pack_format = "!H" + str(len(self._in_packet['packet'])-2) + 's'
+        (mid, packet) = struct.unpack(pack_format, self._in_packet['packet'])
+        pack_format = "!" + "B"*len(packet)
+        granted_qos = struct.unpack(pack_format, packet)
 
-    #    if self.on_subscribe:
-    #        self._in_callback = True
-    #        self.on_subscribe(self, self._userdata, mid, granted_qos)
-    #        self._in_callback = False
+        if self.on_subscribe:
+            self._in_callback = True
+            self.on_subscribe(self, self._userdata, mid, granted_qos)
+            self._in_callback = False
 
-    #    return MQTT_ERR_SUCCESS
+        return MQTT_ERR_SUCCESS
 
     def _handle_publish(self):
         rc = 0

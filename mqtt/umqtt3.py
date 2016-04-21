@@ -50,7 +50,7 @@ mqtt_cs_disconnecting = 2
 mqtt_cs_connect_async = 3
 
 # Message state
-mqtt_ms_invalid = 0
+#mqtt_ms_invalid = 0
 mqtt_ms_publish= 1
 mqtt_ms_wait_for_puback = 2
 mqtt_ms_wait_for_pubrec = 3
@@ -72,7 +72,7 @@ class MQTTMessage:
     def __init__(self):
         print("MQTTMessage Class")
         self.timestamp = 0
-        self.state = mqtt_ms_invalid
+        self.state = 0 #mqtt_ms_invalid
         self.dup = False
         self.mid = 0
         self.topic = ""
@@ -616,20 +616,20 @@ class Client:
             if self._max_inflight_messages == 0 or self._inflight_messages < self._max_inflight_messages:
                 if m.qos == 0:
                     m.state = mqtt_ms_publish
-                elif m.qos == 1:
-                    #self._inflight_messages = self._inflight_messages + 1
-                    if m.state == mqtt_ms_wait_for_puback:
-                        m.dup = True
-                    m.state = mqtt_ms_publish
-                elif m.qos == 2:
-                    #self._inflight_messages = self._inflight_messages + 1
-                    if m.state == mqtt_ms_wait_for_pubcomp:
-                        m.state = mqtt_ms_resend_pubrel
-                        m.dup = True
-                    else:
-                        if m.state == mqtt_ms_wait_for_pubrec:
-                            m.dup = True
-                        m.state = mqtt_ms_publish
+                #elif m.qos == 1:
+                #    #self._inflight_messages = self._inflight_messages + 1
+                #    if m.state == mqtt_ms_wait_for_puback:
+                #        m.dup = True
+                #    m.state = mqtt_ms_publish
+                #elif m.qos == 2:
+                #    #self._inflight_messages = self._inflight_messages + 1
+                #    if m.state == mqtt_ms_wait_for_pubcomp:
+                #        m.state = mqtt_ms_resend_pubrel
+                #        m.dup = True
+                #    else:
+                #        if m.state == mqtt_ms_wait_for_pubrec:
+                #            m.dup = True
+                #        m.state = mqtt_ms_publish
             else:
                 m.state = mqtt_ms_queued
 

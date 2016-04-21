@@ -242,22 +242,22 @@ class Client:
         print("subscribe")
         topic_qos_list = None
         if isinstance(topic, str):
-            if qos<0 or qos>2:
-                raise ValueError('Invalid QoS level.')
+        #    if qos<0 or qos>2:
+        #        raise ValueError('Invalid QoS level.')
             if topic is None or len(topic) == 0:
                 raise ValueError('Invalid topic.')
             topic_qos_list = [(topic.encode('utf-8'), qos)]
-        elif isinstance(topic, tuple):
-            if topic[1]<0 or topic[1]>2:
-                raise ValueError('Invalid QoS level.')
-            if topic[0] is None or len(topic[0]) == 0 or not isinstance(topic[0], str):
-                raise ValueError('Invalid topic.')
-            topic_qos_list = [(topic[0].encode('utf-8'), topic[1])]
+        #elif isinstance(topic, tuple):
+        #    if topic[1]<0 or topic[1]>2:
+        #        raise ValueError('Invalid QoS level.')
+        #    if topic[0] is None or len(topic[0]) == 0 or not isinstance(topic[0], str):
+        #        raise ValueError('Invalid topic.')
+        #    topic_qos_list = [(topic[0].encode('utf-8'), topic[1])]
         elif isinstance(topic, list):
             topic_qos_list = []
             for t in topic:
-                if t[1]<0 or t[1]>2:
-                    raise ValueError('Invalid QoS level.')
+                #if t[1]<0 or t[1]>2:
+                #    raise ValueError('Invalid QoS level.')
                 if t[0] is None or len(t[0]) == 0 or not isinstance(t[0], str):
                     raise ValueError('Invalid topic.')
                 topic_qos_list.append((t[0].encode('utf-8'), t[1]))
@@ -276,9 +276,11 @@ class Client:
         if self._sock is None:
             return MQTT_ERR_NO_CONN
 
+        print("loop_read: max_packets =", max_packets)
         max_packets = len(self._out_messages) + len(self._in_messages)
         if max_packets < 1:
             max_packets = 1
+        print("loop_read:  max_packets =", max_packets)
 
         for i in range(0, max_packets):
             rc = self._packet_read() #only call to _packet_read
@@ -294,9 +296,11 @@ class Client:
         if self._sock is None:
             return MQTT_ERR_NO_CONN
 
+        print("loop_write: max_packets =", max_packets)
         max_packets = len(self._out_packet) + 1
         if max_packets < 1:
             max_packets = 1
+        print("loop_write: max_packets =", max_packets)
 
         for i in range(0, max_packets):
             rc = self._packet_write()
@@ -717,32 +721,32 @@ class Client:
                     self._in_callback = False
                     if rc != 0:
                         return rc
-                elif m.qos == 1:
-                    if m.state == mqtt_ms_publish:
-                        self._inflight_messages = self._inflight_messages + 1
-                        m.state = mqtt_ms_wait_for_puback
-                        self._in_callback = True # Don't call loop_write after _send_publish()
-                        rc = self._send_publish(m.mid, m.topic, m.payload, m.qos, m.retain, m.dup)
-                        self._in_callback = False
-                        if rc != 0:
-                            return rc
-                elif m.qos == 2:
-                    if m.state == mqtt_ms_publish:
-                        self._inflight_messages = self._inflight_messages + 1
-                        m.state = mqtt_ms_wait_for_pubrec
-                        self._in_callback = True # Don't call loop_write after _send_publish()
-                        rc = self._send_publish(m.mid, m.topic, m.payload, m.qos, m.retain, m.dup)
-                        self._in_callback = False
-                        if rc != 0:
-                            return rc
-                    elif m.state == mqtt_ms_resend_pubrel:
-                        self._inflight_messages = self._inflight_messages + 1
-                        m.state = mqtt_ms_wait_for_pubcomp
-                        self._in_callback = True # Don't call loop_write after _send_pubrel()
-                        rc = self._send_pubrel(m.mid, m.dup)
-                        self._in_callback = False
-                        if rc != 0:
-                            return rc
+                #elif m.qos == 1:
+                #    if m.state == mqtt_ms_publish:
+                #        self._inflight_messages = self._inflight_messages + 1
+                #        m.state = mqtt_ms_wait_for_puback
+                #        self._in_callback = True # Don't call loop_write after _send_publish()
+                #        rc = self._send_publish(m.mid, m.topic, m.payload, m.qos, m.retain, m.dup)
+                #        self._in_callback = False
+                #        if rc != 0:
+                #            return rc
+                #elif m.qos == 2:
+                #    if m.state == mqtt_ms_publish:
+                #        self._inflight_messages = self._inflight_messages + 1
+                #        m.state = mqtt_ms_wait_for_pubrec
+                #        self._in_callback = True # Don't call loop_write after _send_publish()
+                #        rc = self._send_publish(m.mid, m.topic, m.payload, m.qos, m.retain, m.dup)
+                #        self._in_callback = False
+                #        if rc != 0:
+                #            return rc
+                #    elif m.state == mqtt_ms_resend_pubrel:
+                #        self._inflight_messages = self._inflight_messages + 1
+                #        m.state = mqtt_ms_wait_for_pubcomp
+                #        self._in_callback = True # Don't call loop_write after _send_pubrel()
+                #        rc = self._send_pubrel(m.mid, m.dup)
+                #        self._in_callback = False
+                #        if rc != 0:
+                #            return rc
                 self.loop_write() # Process outgoing messages that have just been queued up
             return rc
         elif result > 0 and result < 6:

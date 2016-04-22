@@ -39,6 +39,7 @@ PUBLISH = const(0x30)
 SUBSCRIBE = const(0x80)
 SUBACK = const(0x90)
 DISCONNECT = const(0xE0)
+PINGREQ = 0xC0
 
 # CONNACK codes
 CONNACK_REFUSED_PROTOCOL_VERSION = 1
@@ -276,18 +277,24 @@ class Client:
         if self._sock is None:
             return MQTT_ERR_NO_CONN
 
-        print("loop_read: max_packets =", max_packets)
-        max_packets = len(self._out_messages) + len(self._in_messages)
-        if max_packets < 1:
-            max_packets = 1
-        print("loop_read:  max_packets =", max_packets)
+        #max_packets = len(self._out_messages) + len(self._in_messages)
+        #print("loop_read: max_packets =", max_packets)
+        #if max_packets < 1:
+        #    max_packets = 1
+        #print("loop_read:  max_packets =", max_packets)
 
-        for i in range(0, max_packets):
-            rc = self._packet_read() #only call to _packet_read
-            if rc > 0:
-                return self._loop_rc_handle(rc)
-            elif rc == MQTT_ERR_AGAIN:
-                return MQTT_ERR_SUCCESS
+        #for i in range(0, max_packets):
+        #    rc = self._packet_read() #only call to _packet_read
+        #    if rc > 0:
+        #        return self._loop_rc_handle(rc)
+        #    elif rc == MQTT_ERR_AGAIN:
+        #        return MQTT_ERR_SUCCESS
+        rc = self._packet_read() #only call to _packet_read
+        if rc > 0:
+            return self._loop_rc_handle(rc)
+        elif rc == MQTT_ERR_AGAIN:
+            return MQTT_ERR_SUCCESS
+
         return MQTT_ERR_SUCCESS
 
     def loop_write(self):
@@ -296,18 +303,23 @@ class Client:
         if self._sock is None:
             return MQTT_ERR_NO_CONN
 
-        print("loop_write: max_packets =", max_packets)
-        max_packets = len(self._out_packet) + 1
-        if max_packets < 1:
-            max_packets = 1
-        print("loop_write: max_packets =", max_packets)
+        #max_packets = len(self._out_packet) + 1
+        #print("loop_write: max_packets =", max_packets)
+        #if max_packets < 1:
+        #    max_packets = 1
+        #print("loop_write: max_packets =", max_packets)
 
-        for i in range(0, max_packets):
-            rc = self._packet_write()
-            if rc > 0:
-                return self._loop_rc_handle(rc)
-            elif rc == MQTT_ERR_AGAIN:
-                return MQTT_ERR_SUCCESS
+        #for i in range(0, max_packets):
+        #    rc = self._packet_write()
+        #    if rc > 0:
+        #        return self._loop_rc_handle(rc)
+        #    elif rc == MQTT_ERR_AGAIN:
+        #        return MQTT_ERR_SUCCESS
+        rc = self._packet_write()
+        if rc > 0:
+            return self._loop_rc_handle(rc)
+        elif rc == MQTT_ERR_AGAIN:
+            return MQTT_ERR_SUCCESS
         return MQTT_ERR_SUCCESS
 
     def loop_misc(self):
@@ -344,6 +356,21 @@ class Client:
     # ============================================================
     # Private functions
     # ============================================================
+
+    def _loop_rc_handle(self, rc):
+        if rc:
+            if self._sock:
+                self._sock.close()
+                self._sock = None
+
+            if self._state == mqtt_cs_disconnecting:
+                rc = MQTT_ERR_SUCCESS
+            if self.on_disconnect:
+                self._in_callback = True
+                self.on_disconnect(self, self._userdata, rc)
+                self._in_callback = False
+
+        return rc
 
     def _packet_read(self):
         print("_packet_read")
@@ -502,6 +529,12 @@ class Client:
             self._last_mid = 1
         return self._last_mid
 
+    def _send_pingreq(self):
+        rc = self._send_simple_command(PINGREQ)
+        if rc == MQTT_ERR_SUCCESS:
+            self._ping_t = time.time()
+        return rc
+
     def _pack_remaining_length(self, packet, remaining_length):
         print("_pack_remaining_length")
         remaining_bytes = []
@@ -529,6 +562,12 @@ class Client:
             packet.extend(struct.pack(pack_format, len(udata), udata))
         else:
             raise TypeError
+
+    def _send_simple_command(self, command):
+        # For DISCONNECT, PINGREQ and PINGRESP
+        remaining_length = 0
+        packet = struct.pack('!BB', command, remaining_length)
+        return self._packet_queue(command, packet, 0, 0)
 
     def _send_connect(self, keepalive, clean_session):
         print("_send_connect")

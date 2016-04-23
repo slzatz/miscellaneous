@@ -36,11 +36,7 @@ PROTOCOL_VERSION = const(3)
 CONNECT = const(0x10) #needed
 CONNACK = const(0x20) #needed
 PUBLISH = const(0x30) #needed
-PUBACK = 0x40
-PUBREC = 0x50
-PUBREL = 0x60
-PUBCOMP = 0x70
-SUBSCRIBE = const(0x80)
+SUBSCRIBE = const(0x80) #needed
 SUBACK = const(0x90) #needed
 DISCONNECT = const(0xE0) #needed
 PINGREQ = 0xC0 #needed
@@ -88,10 +84,7 @@ class MQTTMessage:
 
 class Client:
     """MQTT version 3.1/3.1.1 client class."""
-    #def __init__(self, client_id="", clean_session=True, userdata=None, protocol=MQTTv31):
     def __init__(self, client_id="", userdata=None, protocol=MQTTv31):
-        #if not clean_session and (client_id == "" or client_id is None):
-            #raise ValueError('A client id must be provided if clean session is False.')
         print("Client Class")
         self._protocol = protocol
         self._userdata = userdata
@@ -99,7 +92,6 @@ class Client:
         self._keepalive = 60
         self._message_retry = 20
         self._last_retry_check = 0
-        #self._clean_session = clean_session
         if client_id == "" or client_id is None:
             self._client_id = "umqtt"
         else:
@@ -123,8 +115,6 @@ class Client:
         self._ping_t = 0
         self._last_mid = 0
         self._state = mqtt_cs_new
-        self._out_messages = []
-        self._in_messages = []
         self._max_inflight_messages = 20
         self._inflight_messages = 0
         self.on_disconnect = None
@@ -138,7 +128,6 @@ class Client:
         self._port = 1883
         self._bind_address = ""
         self._in_callback = False
-        #self._strict_protocol = False
 
     def __del__(self):
         print("__del__ Client")
@@ -168,7 +157,7 @@ class Client:
         self._port = port
         self._keepalive = keepalive
         self._bind_address = bind_address
-
+        print("connect_async: self._state =", self._state)
         self._state = mqtt_cs_connect_async
 
     def reconnect(self):
@@ -198,14 +187,12 @@ class Client:
         self._last_msg_out = time.time()
 
         self._ping_t = 0
+        print("reconnect: self._state =", self._state)
         self._state = mqtt_cs_new
         if self._sock:
             self._sock.close()
             self._sock = None
             print("self._sock == None")
-
-        # Put messages in progress in a valid state.
-        self._messages_reconnect_reset()
 
         sock = socket.create_connection((self._host, self._port), source_address=(self._bind_address, 0))
         self._sock = sock
@@ -216,7 +203,7 @@ class Client:
 
         print("self._sock =", self._sock)
 
-        return self._send_connect(self._keepalive, self._clean_session)
+        return self._send_connect(self._keepalive)
 
     def loop(self, timeout=1):
         """Process network events.
@@ -297,7 +284,7 @@ class Client:
         self._check_keepalive()
         if self._last_retry_check+1 < now:
             # Only check once a second at most
-            self._message_retry_check()
+            # can this go? ############################
             self._last_retry_check = now
 
         if self._ping_t > 0 and now - self._ping_t >= self._keepalive:
@@ -306,7 +293,7 @@ class Client:
             if self._sock:
                 self._sock.close()
                 self._sock = None
-
+            print("loop_misc: self._state =", self._state)
             if self._state == mqtt_cs_disconnecting:
                 rc = MQTT_ERR_SUCCESS
             else:
@@ -321,21 +308,6 @@ class Client:
     # ============================================================
     # Private functions
     # ============================================================
-
-    #def _loop_rc_handle(self, rc):
-    #    if rc:
-    #        if self._sock:
-    #            self._sock.close()
-    #            self._sock = None
-
-    #        if self._state == mqtt_cs_disconnecting:
-    #            rc = MQTT_ERR_SUCCESS
-    #        if self.on_disconnect:
-    #            self._in_callback = True
-    #            self.on_disconnect(self, self._userdata, rc)
-    #            self._in_callback = False
-
-    #    return rc
 
     def _packet_read(self):
         print("_packet_read")
@@ -470,6 +442,7 @@ class Client:
         last_msg_out = self._last_msg_out
         last_msg_in = self._last_msg_in
         if (self._sock is not None) and (now - last_msg_out >= self._keepalive or now - last_msg_in >= self._keepalive):
+            print("_check_keepalive: self._state =", self._state)
             if self._state == mqtt_cs_connected and self._ping_t == 0:
                 self._send_pingreq()
                 self._last_msg_out = now
@@ -535,8 +508,7 @@ class Client:
         packet = struct.pack('!BB', command, remaining_length)
         return self._packet_queue(command, packet, 0, 0)
 
-    #def _send_connect(self, keepalive, clean_session):
-    def _send_connect(self, keepalive)
+    def _send_connect(self, keepalive):
         print("_send_connect")
         if self._protocol == MQTTv31:
             protocol = PROTOCOL_NAMEv31
@@ -590,57 +562,6 @@ class Client:
             packet.extend(struct.pack("B", t[1]))
         return (self._packet_queue(command, packet, local_mid, 1), local_mid)
 
-    def _message_retry_check_actual(self, messages):
-        print("_message_retry_check_actual") #needed
-        now = time.time()
-        for m in messages:
-            if m.timestamp + self._message_retry < now:
-                if m.state == mqtt_ms_wait_for_puback or m.state == mqtt_ms_wait_for_pubrec:
-                    m.timestamp = now
-                    m.dup = True
-                    self._send_publish(m.mid, m.topic, m.payload, m.qos, m.retain, m.dup)
-                elif m.state == mqtt_ms_wait_for_pubrel:
-                    m.timestamp = now
-                    m.dup = True
-                    self._send_pubrec(m.mid)
-                elif m.state == mqtt_ms_wait_for_pubcomp:
-                    m.timestamp = now
-                    m.dup = True
-                    self._send_pubrel(m.mid, True)
-
-    def _message_retry_check(self):
-        print("_message_retry_check") #needed
-        print("_message_retry_check: self._out_messages = ", self._out_messages)
-        self._message_retry_check_actual(self._out_messages)
-        self._message_retry_check_actual(self._in_messages)
-
-    def _messages_reconnect_reset_out(self):
-        print("_messages_reconnect_reset_out") #needed
-        self._inflight_messages = 0
-        print("_message_reconnect_reset_out: self._out_messages = ", self._out_messages)
-        for m in self._out_messages:
-            m.timestamp = 0
-            if self._max_inflight_messages == 0 or self._inflight_messages < self._max_inflight_messages:
-                if m.qos == 0:
-                    m.state = mqtt_ms_publish
-            else:
-                m.state = mqtt_ms_queued
-
-    def _messages_reconnect_reset_in(self):
-        print("_messages_reconnect_reset_in") #needed
-        for m in self._in_messages:
-            m.timestamp = 0
-            if m.qos != 2:
-                self._in_messages.pop(self._in_messages.index(m))
-            else:
-                # Preserve current state
-                pass
-
-    def _messages_reconnect_reset(self):
-        print("_messages_reconnect_reset") #needed
-        self._messages_reconnect_reset_out()
-        self._messages_reconnect_reset_in()
-
     def _packet_queue(self, command, packet, mid, qos):
         print("_packet_queue") #needed
         mpkt = dict(
@@ -678,41 +599,13 @@ class Client:
         elif cmd == PUBLISH: #needed
             print("_packet_handle: PUBLISH")
             return self._handle_publish()
-        #elif cmd == PINGREQ:
-        #    print("_packet_handle: PINGREQ")
-        #    return self._handle_pingreq()
-        #elif cmd == PUBACK:
-        #    print("_packet_handle: PUBACK")
-        #    return self._handle_pubackcomp("PUBACK")
-        #elif cmd == PUBCOMP:
-        #    print("_packet_handle: PUBCOMP")
-        #    return self._handle_pubackcomp("PUBCOMP")
-        #elif cmd == PUBREC:
-        #    print("_packet_handle: PUBREC")
-        #    return self._handle_pubrec()
-        #elif cmd == PUBREL:
-        #    print("_packet_handle: PUBREL")
-        #    return self._handle_pubrel()
-        #elif cmd == UNSUBACK:
-        #    return self._handle_unsuback()
         else:
             # If we don't recognise the command, return an error straight away.
             print("_packet_haandle: didn't recognize command")
             return MQTT_ERR_PROTOCOL
-#############################################
-    #def _handle_pingreq(self):
-    #    print("_handle_pingreq")
-    #    if self._strict_protocol:
-    #        if self._in_packet['remaining_length'] != 0:
-    #            return MQTT_ERR_PROTOCOL
-
-    #    return self._send_pingresp()
 
     def _handle_pingresp(self):
         print("_handle_pingresp")
-        #if self._strict_protocol:
-        #    if self._in_packet['remaining_length'] != 0:
-        #        return MQTT_ERR_PROTOCOL
 
         # No longer waiting for a PINGRESP.
         self._ping_t = 0
@@ -732,6 +625,7 @@ class Client:
 
         if result == 0:
             self._state = mqtt_cs_connected
+            print("_handle_connack: self._state =", self._state)
 
         if self.on_connect:
             self._in_callback = True
@@ -743,20 +637,6 @@ class Client:
 
         if result == 0:
             rc = 0
-            print("_handle_connack: self._out_messages = ", self._out_messages)
-            for m in self._out_messages:
-                m.timestamp = time.time()
-                if m.state == mqtt_ms_queued:
-                    self.loop_write() # Process outgoing messages that have just been queued up
-                    return MQTT_ERR_SUCCESS
-
-                if m.qos == 0:
-                    self._in_callback = True # Don't call loop_write after _send_publish()
-                    rc = self._send_publish(m.mid, m.topic, m.payload, m.qos, m.retain, m.dup)
-                    self._in_callback = False
-                    if rc != 0:
-                        return rc
-                self.loop_write() # Process outgoing messages that have just been queued up
             return rc
         elif result > 0 and result < 6:
             return MQTT_ERR_CONN_REFUSED

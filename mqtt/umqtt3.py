@@ -707,18 +707,57 @@ class Client:
         else:
             return MQTT_ERR_SUCCESS
 
-    def _packet_handle(self):
-        print("_packet_handle")
+    #def _packet_handle(self):
+    #    print("_packet_handle")
+    #    cmd = self._in_packet['command']&0xF0
+    #    if cmd == PUBLISH: #appear to need PUBLISH
+    #        return self._handle_publish()
+    #    elif cmd == CONNACK:
+    #        return self._handle_connack()
+    #    elif cmd == SUBACK:
+    #        return self._handle_suback()
+    #    else:
+    #        print("_packet_handle: did't recognice command -", cmd)
+    #        # If we don't recognise the command, return an error straight away.
+    #        return MQTT_ERR_PROTOCOL
+
+############################################3
+ def _packet_handle(self):
         cmd = self._in_packet['command']&0xF0
-        if cmd == PUBLISH: #appear to need PUBLISH
+        if cmd == PINGREQ:
+            print("_packet_handle: PINGREQ")
+            return self._handle_pingreq()
+        elif cmd == PINGRESP:
+            print("_packet_handle: PINGRESP")
+            return self._handle_pingresp()
+        elif cmd == PUBACK:
+            print("_packet_handle: PUBACK")
+            return self._handle_pubackcomp("PUBACK")
+        elif cmd == PUBCOMP:
+            print("_packet_handle: PUBCOMP")
+            return self._handle_pubackcomp("PUBCOMP")
+        elif cmd == PUBLISH:
+            print("_packet_handle: PUBLISH")
             return self._handle_publish()
+        elif cmd == PUBREC:
+            print("_packet_handle: PUBREC")
+            return self._handle_pubrec()
+        elif cmd == PUBREL:
+            print("_packet_handle: PUBREL")
+            return self._handle_pubrel()
         elif cmd == CONNACK:
+            print("_packet_handle: CONNACK")
             return self._handle_connack()
         elif cmd == SUBACK:
+            print("_packet_handle: SUBACK")
             return self._handle_suback()
+        elif cmd == UNSUBACK:
+            return self._handle_unsuback()
         else:
             # If we don't recognise the command, return an error straight away.
+            self._easy_log(MQTT_LOG_ERR, "Error: Unrecognised command "+str(cmd))
             return MQTT_ERR_PROTOCOL
+#############################################
 
     def _handle_connack(self):
         print("_handle_connack") #needed

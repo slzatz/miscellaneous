@@ -38,7 +38,6 @@ CONNACK = const(0x20) #needed
 PUBLISH = const(0x30) #needed
 SUBSCRIBE = const(0x80) #needed
 SUBACK = const(0x90) #needed
-DISCONNECT = const(0xE0) #needed
 PINGREQ = 0xC0 #needed
 PINGRESP = const(0xD0) #needed
 
@@ -50,16 +49,6 @@ mqtt_cs_new = 0
 mqtt_cs_connected = 1
 mqtt_cs_disconnecting = 2
 mqtt_cs_connect_async = 3
-
-# Message state
-#mqtt_ms_invalid = 0
-mqtt_ms_publish= 1
-mqtt_ms_wait_for_puback = 2
-mqtt_ms_wait_for_pubrec = 3
-mqtt_ms_resend_pubrel = 4
-mqtt_ms_wait_for_pubrel = 5
-mqtt_ms_wait_for_pubcomp = 7
-mqtt_ms_queued = 9
 
 # Error values
 MQTT_ERR_AGAIN = -1
@@ -117,17 +106,12 @@ class Client:
         self._state = mqtt_cs_new
         self._max_inflight_messages = 20
         self._inflight_messages = 0
-        self.on_disconnect = None
         self.on_connect = None
-        self.on_publish = None
         self.on_message = None
-        self.on_message_filtered = []
         self.on_subscribe = None
-        self.on_unsubscribe = None
         self._host = ""
         self._port = 1883
         self._bind_address = ""
-        self._in_callback = False
 
     def __del__(self):
         print("__del__ Client")
@@ -137,37 +121,23 @@ class Client:
         """Connect to a remote broker.
         """
         print("connect")
-        self.connect_async(host, port, keepalive, bind_address)
-        return self.reconnect()
-
-    def connect_async(self, host, port=1883, keepalive=60, bind_address=""):
-        """Connect to a remote broker asynchronously. This is a non-blocking
-        connect call that can be used with loop_start() to provide very quick
-        start.
-        """
-        print("connect_async")
-        if host is None or len(host) == 0:
-            raise ValueError('Invalid host.')
-        if port <= 0:
-            raise ValueError('Invalid port number.')
-        if keepalive < 0:
-            raise ValueError('Keepalive must be >=0.')
 
         self._host = host
         self._port = port
         self._keepalive = keepalive
         self._bind_address = bind_address
-        print("connect_async: self._state =", self._state)
+        print("connect: self._state =", self._state)
         self._state = mqtt_cs_connect_async
+        return self.reconnect()
 
     def reconnect(self):
         """Reconnect the client after a disconnect. Can only be called after
         connect()/connect_async()."""
         print("reconnect")
-        if len(self._host) == 0:
-            raise ValueError('Invalid host.')
-        if self._port <= 0:
-            raise ValueError('Invalid port number.')
+        #if len(self._host) == 0:
+        #    raise ValueError('Invalid host.')
+        #if self._port <= 0:
+        #    raise ValueError('Invalid port number.')
 
         self._in_packet = {
             "command": 0,
@@ -218,7 +188,27 @@ class Client:
                 if rc or (self._sock is None):
                     return rc
 
-        return self.loop_misc()
+        #return self.loop_misc()
+        if self._sock is None:
+            return MQTT_ERR_NO_CONN
+
+        now = time.time()
+        self._check_keepalive()
+        if self._last_retry_check+1 < now:
+            # Only check once a second at most
+            # can this go? ############################
+            self._last_retry_check = now
+
+        if self._ping_t > 0 and now - self._ping_t >= self._keepalive:
+            # client->ping_t != 0 means we are waiting for a pingresp.
+            # This hasn't happened in the keepalive time so we should disconnect.
+            if self._sock:
+                self._sock.close()
+                self._sock = None
+
+            return MQTT_ERR_CONN_LOST
+
+        return MQTT_ERR_SUCCESS
 
     def subscribe(self, topic, qos=0):
         """Subscribe the client to one or more topics."""
@@ -272,37 +262,6 @@ class Client:
             return rc
         elif rc == MQTT_ERR_AGAIN:
             return MQTT_ERR_SUCCESS
-        return MQTT_ERR_SUCCESS
-
-    def loop_misc(self):
-        """Process miscellaneous network events.""" 
-        print("loop_misc")
-        if self._sock is None:
-            return MQTT_ERR_NO_CONN
-
-        now = time.time()
-        self._check_keepalive()
-        if self._last_retry_check+1 < now:
-            # Only check once a second at most
-            # can this go? ############################
-            self._last_retry_check = now
-
-        if self._ping_t > 0 and now - self._ping_t >= self._keepalive:
-            # client->ping_t != 0 means we are waiting for a pingresp.
-            # This hasn't happened in the keepalive time so we should disconnect.
-            if self._sock:
-                self._sock.close()
-                self._sock = None
-            print("loop_misc: self._state =", self._state)
-            if self._state == mqtt_cs_disconnecting:
-                rc = MQTT_ERR_SUCCESS
-            else:
-                rc = 1
-            if self.on_disconnect:
-                self._in_callback = True
-                self.on_disconnect(self, self._userdata, rc)
-                self._in_callback = False
-            return MQTT_ERR_CONN_LOST
         return MQTT_ERR_SUCCESS
 
     # ============================================================
@@ -407,23 +366,6 @@ class Client:
                 packet['pos'] = packet['pos'] + write_length
 
                 if packet['to_process'] == 0:
-                    if (packet['command'] & 0xF0) == PUBLISH and packet['qos'] == 0:
-                        if self.on_publish:
-                            self._in_callback = True
-                            self.on_publish(self, self._userdata, packet['mid'])
-                            self._in_callback = False
-
-                    if (packet['command'] & 0xF0) == DISCONNECT:
-                        self._last_msg_out = time.time()
-                        if self.on_disconnect:
-                            self._in_callback = True
-                            self.on_disconnect(self, self._userdata, 0)
-                            self._in_callback = False
-
-                        if self._sock:
-                            self._sock.close()
-                            self._sock = None
-                        return MQTT_ERR_SUCCESS
 
                     if len(self._out_packet) > 0:
                         self._current_out_packet = self._out_packet.pop(0)
@@ -439,6 +381,8 @@ class Client:
     def _check_keepalive(self):
         print("_check_keepalive")
         now = time.time()
+        print("_check_keepalive: self._last_msg_out = ", self._last_msg_out)
+        print("_check_keepalive: self._last_msg_in = ", self._last_msg_in)
         last_msg_out = self._last_msg_out
         last_msg_in = self._last_msg_in
         if (self._sock is not None) and (now - last_msg_out >= self._keepalive or now - last_msg_in >= self._keepalive):
@@ -456,10 +400,6 @@ class Client:
                     rc = MQTT_ERR_SUCCESS
                 else:
                     rc = 1
-                if self.on_disconnect:
-                    self._in_callback = True
-                    self.on_disconnect(self, self._userdata, rc)
-                    self._in_callback = False
 
     def _mid_generate(self):
         print("_mid_generate")
@@ -503,6 +443,7 @@ class Client:
             raise TypeError
 
     def _send_simple_command(self, command):
+        print("_send_simple_command")
         # For DISCONNECT, PINGREQ and PINGRESP
         remaining_length = 0
         packet = struct.pack('!BB', command, remaining_length)
@@ -579,12 +520,8 @@ class Client:
             self._current_out_packet = self._out_packet.pop(0)
 
         print("_packet_queue: self._out_packet =", self._out_packet)
-        if not self._in_callback: 
-            return self.loop_write()
-        else:
-            return MQTT_ERR_SUCCESS
+        return self.loop_write()
 
-############################################3
     def _packet_handle(self):
         cmd = self._in_packet['command']&0xF0
         if cmd == CONNACK: #needed
@@ -628,12 +565,9 @@ class Client:
             print("_handle_connack: self._state =", self._state)
 
         if self.on_connect:
-            self._in_callback = True
-
             flags_dict = dict()
             flags_dict['session present'] = flags & 0x01
             self.on_connect(self, self._userdata, flags_dict, result)
-            self._in_callback = False
 
         if result == 0:
             rc = 0
@@ -651,9 +585,7 @@ class Client:
         granted_qos = struct.unpack(pack_format, packet)
 
         if self.on_subscribe:
-            self._in_callback = True
             self.on_subscribe(self, self._userdata, mid, granted_qos)
-            self._in_callback = False
 
         return MQTT_ERR_SUCCESS
 
@@ -663,7 +595,7 @@ class Client:
         header = self._in_packet['command']
         message = MQTTMessage()
         message.dup = (header & 0x08)>>3
-        message.qos = (header & 0x06)>>1
+        #message.qos = (header & 0x06)>>1
         message.retain = (header & 0x01)
 
         pack_format = "!H" + str(len(self._in_packet['packet'])-2) + 's'
@@ -671,31 +603,21 @@ class Client:
         pack_format = '!' + str(slen) + 's' + str(len(packet)-slen) + 's'
         (message.topic, packet) = struct.unpack(pack_format, packet)
 
-        if len(message.topic) == 0:
-            return MQTT_ERR_PROTOCOL
+        #if len(message.topic) == 0:
+        #    return MQTT_ERR_PROTOCOL
 
         message.topic = message.topic.decode('utf-8')
 
         message.payload = packet
 
         message.timestamp = time.time()
-        if message.qos == 0:
-            self._handle_on_message(message)
-            return MQTT_ERR_SUCCESS
-        else:
-            return MQTT_ERR_PROTOCOL
+        #print("_handle_publish:  message.qos = ", message.qos)
+        #if message.qos == 0:
+        #    print("_handle_publish: location 1")
+        #    self.on_message(self, self._userdata, message)
+        #    return MQTT_ERR_SUCCESS
+        #else:
+        #    print("_handle_publish: location 2")
+        #    return MQTT_ERR_PROTOCOL
 
-    def _handle_on_message(self, message):
-        print("_handle_on_message")
-        matched = False
-        for t in self.on_message_filtered:
-            if topic_matches_sub(t[0], message.topic):
-                self._in_callback = True
-                t[1](self, self._userdata, message)
-                self._in_callback = False
-                matched = True
-
-        if matched == False and self.on_message:
-            self._in_callback = True
-            self.on_message(self, self._userdata, message)
-            self._in_callback = False
+        self.on_message(self, self._userdata, message)

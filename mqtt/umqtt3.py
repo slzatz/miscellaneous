@@ -88,9 +88,10 @@ class MQTTMessage:
 
 class Client:
     """MQTT version 3.1/3.1.1 client class."""
-    def __init__(self, client_id="", clean_session=True, userdata=None, protocol=MQTTv31):
-        if not clean_session and (client_id == "" or client_id is None):
-            raise ValueError('A client id must be provided if clean session is False.')
+    #def __init__(self, client_id="", clean_session=True, userdata=None, protocol=MQTTv31):
+    def __init__(self, client_id="", userdata=None, protocol=MQTTv31):
+        #if not clean_session and (client_id == "" or client_id is None):
+            #raise ValueError('A client id must be provided if clean session is False.')
         print("Client Class")
         self._protocol = protocol
         self._userdata = userdata
@@ -98,7 +99,7 @@ class Client:
         self._keepalive = 60
         self._message_retry = 20
         self._last_retry_check = 0
-        self._clean_session = clean_session
+        #self._clean_session = clean_session
         if client_id == "" or client_id is None:
             self._client_id = "umqtt"
         else:
@@ -222,12 +223,6 @@ class Client:
         """
         print("loop")
 
-        #print("self._current_out_packet =", self._current_out_packet)
-        #print("self._out_packet =", self._out_packet)
-        #if self._current_out_packet is None and len(self._out_packet) > 0:
-        #    self._current_out_packet = self._out_packet.pop(0)
-        #print("self._current_out_packet =", self._current_out_packet)
-
         events = self.ep.poll(timeout)
         print("events = ", events)
         for fileno, ev in events:
@@ -236,11 +231,6 @@ class Client:
                 if rc or (self._sock is None):
                     return rc
 
-            #if ev & select.EPOLLOUT and self._current_out_packet:
-            #    rc = self.loop_write()
-            #    if rc or (self._sock is None):
-            #        return rc
-
         return self.loop_misc()
 
     def subscribe(self, topic, qos=0):
@@ -248,17 +238,9 @@ class Client:
         print("subscribe")
         topic_qos_list = None
         if isinstance(topic, str):
-        #    if qos<0 or qos>2:
-        #        raise ValueError('Invalid QoS level.')
             if topic is None or len(topic) == 0:
                 raise ValueError('Invalid topic.')
             topic_qos_list = [(topic.encode('utf-8'), qos)]
-        #elif isinstance(topic, tuple):
-        #    if topic[1]<0 or topic[1]>2:
-        #        raise ValueError('Invalid QoS level.')
-        #    if topic[0] is None or len(topic[0]) == 0 or not isinstance(topic[0], str):
-        #        raise ValueError('Invalid topic.')
-        #    topic_qos_list = [(topic[0].encode('utf-8'), topic[1])]
         elif isinstance(topic, list):
             topic_qos_list = []
             for t in topic:
@@ -282,18 +264,6 @@ class Client:
         if self._sock is None:
             return MQTT_ERR_NO_CONN
 
-        #max_packets = len(self._out_messages) + len(self._in_messages)
-        #print("loop_read: max_packets =", max_packets)
-        #if max_packets < 1:
-        #    max_packets = 1
-        #print("loop_read:  max_packets =", max_packets)
-
-        #for i in range(0, max_packets):
-        #    rc = self._packet_read() #only call to _packet_read
-        #    if rc > 0:
-        #        return self._loop_rc_handle(rc)
-        #    elif rc == MQTT_ERR_AGAIN:
-        #        return MQTT_ERR_SUCCESS
         rc = self._packet_read() #only call to _packet_read
         if rc > 0:
             #return self._loop_rc_handle(rc)
@@ -309,18 +279,6 @@ class Client:
         if self._sock is None:
             return MQTT_ERR_NO_CONN
 
-        #max_packets = len(self._out_packet) + 1
-        #print("loop_write: max_packets =", max_packets)
-        #if max_packets < 1:
-        #    max_packets = 1
-        #print("loop_write: max_packets =", max_packets)
-
-        #for i in range(0, max_packets):
-        #    rc = self._packet_write()
-        #    if rc > 0:
-        #        return self._loop_rc_handle(rc)
-        #    elif rc == MQTT_ERR_AGAIN:
-        #        return MQTT_ERR_SUCCESS
         rc = self._packet_write()
         if rc > 0:
             #return self._loop_rc_handle(rc)
@@ -577,7 +535,8 @@ class Client:
         packet = struct.pack('!BB', command, remaining_length)
         return self._packet_queue(command, packet, 0, 0)
 
-    def _send_connect(self, keepalive, clean_session):
+    #def _send_connect(self, keepalive, clean_session):
+    def _send_connect(self, keepalive)
         print("_send_connect")
         if self._protocol == MQTTv31:
             protocol = PROTOCOL_NAMEv31
@@ -587,8 +546,7 @@ class Client:
             proto_ver = 4
         remaining_length = 2+len(protocol) + 1+1+2 + 2+len(self._client_id)
         connect_flags = 0
-        if clean_session:
-            connect_flags = connect_flags | 0x02
+        connect_flags = connect_flags | 0x02
 
         if self._username:
             remaining_length = remaining_length + 2+len(self._username)
@@ -652,31 +610,19 @@ class Client:
 
     def _message_retry_check(self):
         print("_message_retry_check") #needed
+        print("_message_retry_check: self._out_messages = ", self._out_messages)
         self._message_retry_check_actual(self._out_messages)
         self._message_retry_check_actual(self._in_messages)
 
     def _messages_reconnect_reset_out(self):
         print("_messages_reconnect_reset_out") #needed
         self._inflight_messages = 0
+        print("_message_reconnect_reset_out: self._out_messages = ", self._out_messages)
         for m in self._out_messages:
             m.timestamp = 0
             if self._max_inflight_messages == 0 or self._inflight_messages < self._max_inflight_messages:
                 if m.qos == 0:
                     m.state = mqtt_ms_publish
-                #elif m.qos == 1:
-                #    #self._inflight_messages = self._inflight_messages + 1
-                #    if m.state == mqtt_ms_wait_for_puback:
-                #        m.dup = True
-                #    m.state = mqtt_ms_publish
-                #elif m.qos == 2:
-                #    #self._inflight_messages = self._inflight_messages + 1
-                #    if m.state == mqtt_ms_wait_for_pubcomp:
-                #        m.state = mqtt_ms_resend_pubrel
-                #        m.dup = True
-                #    else:
-                #        if m.state == mqtt_ms_wait_for_pubrec:
-                #            m.dup = True
-                #        m.state = mqtt_ms_publish
             else:
                 m.state = mqtt_ms_queued
 
@@ -774,9 +720,6 @@ class Client:
 
     def _handle_connack(self):
         print("_handle_connack") #needed
-        #if self._strict_protocol:
-        #    if self._in_packet['remaining_length'] != 2:
-        #        return MQTT_ERR_PROTOCOL
 
         if len(self._in_packet['packet']) != 2:
             return MQTT_ERR_PROTOCOL
@@ -800,6 +743,7 @@ class Client:
 
         if result == 0:
             rc = 0
+            print("_handle_connack: self._out_messages = ", self._out_messages)
             for m in self._out_messages:
                 m.timestamp = time.time()
                 if m.state == mqtt_ms_queued:
@@ -812,32 +756,6 @@ class Client:
                     self._in_callback = False
                     if rc != 0:
                         return rc
-                #elif m.qos == 1:
-                #    if m.state == mqtt_ms_publish:
-                #        self._inflight_messages = self._inflight_messages + 1
-                #        m.state = mqtt_ms_wait_for_puback
-                #        self._in_callback = True # Don't call loop_write after _send_publish()
-                #        rc = self._send_publish(m.mid, m.topic, m.payload, m.qos, m.retain, m.dup)
-                #        self._in_callback = False
-                #        if rc != 0:
-                #            return rc
-                #elif m.qos == 2:
-                #    if m.state == mqtt_ms_publish:
-                #        self._inflight_messages = self._inflight_messages + 1
-                #        m.state = mqtt_ms_wait_for_pubrec
-                #        self._in_callback = True # Don't call loop_write after _send_publish()
-                #        rc = self._send_publish(m.mid, m.topic, m.payload, m.qos, m.retain, m.dup)
-                #        self._in_callback = False
-                #        if rc != 0:
-                #            return rc
-                #    elif m.state == mqtt_ms_resend_pubrel:
-                #        self._inflight_messages = self._inflight_messages + 1
-                #        m.state = mqtt_ms_wait_for_pubcomp
-                #        self._in_callback = True # Don't call loop_write after _send_pubrel()
-                #        rc = self._send_pubrel(m.mid, m.dup)
-                #        self._in_callback = False
-                #        if rc != 0:
-                #            return rc
                 self.loop_write() # Process outgoing messages that have just been queued up
             return rc
         elif result > 0 and result < 6:
@@ -878,27 +796,12 @@ class Client:
 
         message.topic = message.topic.decode('utf-8')
 
-        #if message.qos > 0:
-        #    pack_format = "!H" + str(len(packet)-2) + 's'
-        #    (message.mid, packet) = struct.unpack(pack_format, packet)
-
         message.payload = packet
 
         message.timestamp = time.time()
         if message.qos == 0:
             self._handle_on_message(message)
             return MQTT_ERR_SUCCESS
-        #elif message.qos == 1:
-        #    rc = self._send_puback(message.mid)
-        #    self._handle_on_message(message)
-        #    return rc
-        #elif message.qos == 2:
-        #    rc = self._send_pubrec(message.mid)
-        #    message.state = mqtt_ms_wait_for_pubrel
-        #    self._in_message_mutex.acquire()
-        #    self._in_messages.append(message)
-        #    self._in_message_mutex.release()
-        #    return rc
         else:
             return MQTT_ERR_PROTOCOL
 

@@ -33,13 +33,18 @@ PROTOCOL_NAMEv311 = b"MQTT"
 PROTOCOL_VERSION = const(3)
 
 # Message types
-CONNECT = const(0x10)
-CONNACK = const(0x20)
-PUBLISH = const(0x30)
+CONNECT = const(0x10) #needed
+CONNACK = const(0x20) #needed
+PUBLISH = const(0x30) #needed
+PUBACK = 0x40
+PUBREC = 0x50
+PUBREL = 0x60
+PUBCOMP = 0x70
 SUBSCRIBE = const(0x80)
-SUBACK = const(0x90)
-DISCONNECT = const(0xE0)
-PINGREQ = 0xC0
+SUBACK = const(0x90) #needed
+DISCONNECT = const(0xE0) #needed
+PINGREQ = 0xC0 #needed
+PINGRESP = const(0xD0) #needed
 
 # CONNACK codes
 CONNACK_REFUSED_PROTOCOL_VERSION = 1
@@ -132,7 +137,7 @@ class Client:
         self._port = 1883
         self._bind_address = ""
         self._in_callback = False
-        self._strict_protocol = False
+        #self._strict_protocol = False
 
     def __del__(self):
         print("__del__ Client")
@@ -217,11 +222,11 @@ class Client:
         """
         print("loop")
 
-        print("self._current_out_packet =", self._current_out_packet)
-        print("self._out_packet =", self._out_packet)
-        if self._current_out_packet is None and len(self._out_packet) > 0:
-            self._current_out_packet = self._out_packet.pop(0)
-        print("self._current_out_packet =", self._current_out_packet)
+        #print("self._current_out_packet =", self._current_out_packet)
+        #print("self._out_packet =", self._out_packet)
+        #if self._current_out_packet is None and len(self._out_packet) > 0:
+        #    self._current_out_packet = self._out_packet.pop(0)
+        #print("self._current_out_packet =", self._current_out_packet)
 
         events = self.ep.poll(timeout)
         print("events = ", events)
@@ -231,10 +236,10 @@ class Client:
                 if rc or (self._sock is None):
                     return rc
 
-            if ev & select.EPOLLOUT and self._current_out_packet:
-                rc = self.loop_write()
-                if rc or (self._sock is None):
-                    return rc
+            #if ev & select.EPOLLOUT and self._current_out_packet:
+            #    rc = self.loop_write()
+            #    if rc or (self._sock is None):
+            #        return rc
 
         return self.loop_misc()
 
@@ -291,7 +296,8 @@ class Client:
         #        return MQTT_ERR_SUCCESS
         rc = self._packet_read() #only call to _packet_read
         if rc > 0:
-            return self._loop_rc_handle(rc)
+            #return self._loop_rc_handle(rc)
+            return rc
         elif rc == MQTT_ERR_AGAIN:
             return MQTT_ERR_SUCCESS
 
@@ -317,7 +323,8 @@ class Client:
         #        return MQTT_ERR_SUCCESS
         rc = self._packet_write()
         if rc > 0:
-            return self._loop_rc_handle(rc)
+            #return self._loop_rc_handle(rc)
+            return rc
         elif rc == MQTT_ERR_AGAIN:
             return MQTT_ERR_SUCCESS
         return MQTT_ERR_SUCCESS
@@ -357,20 +364,20 @@ class Client:
     # Private functions
     # ============================================================
 
-    def _loop_rc_handle(self, rc):
-        if rc:
-            if self._sock:
-                self._sock.close()
-                self._sock = None
+    #def _loop_rc_handle(self, rc):
+    #    if rc:
+    #        if self._sock:
+    #            self._sock.close()
+    #            self._sock = None
 
-            if self._state == mqtt_cs_disconnecting:
-                rc = MQTT_ERR_SUCCESS
-            if self.on_disconnect:
-                self._in_callback = True
-                self.on_disconnect(self, self._userdata, rc)
-                self._in_callback = False
+    #        if self._state == mqtt_cs_disconnecting:
+    #            rc = MQTT_ERR_SUCCESS
+    #        if self.on_disconnect:
+    #            self._in_callback = True
+    #            self.on_disconnect(self, self._userdata, rc)
+    #            self._in_callback = False
 
-        return rc
+    #    return rc
 
     def _packet_read(self):
         print("_packet_read")
@@ -452,6 +459,7 @@ class Client:
         print("_packet_write")
 
         while self._current_out_packet:
+            print("_packet_write: self._current_out_packet = ",self._current_out_packet)
             packet = self._current_out_packet
 
             try:
@@ -495,7 +503,7 @@ class Client:
                 break
 
         self._last_msg_out = time.time()
-        print("self._current_out_packet =", self._current_out_packet)
+        print("_packet_write: end: self._current_out_packet =", self._current_out_packet)
         return MQTT_ERR_SUCCESS
 
     def _check_keepalive(self):
@@ -696,74 +704,79 @@ class Client:
             pos = 0,
             to_process = len(packet),
             packet = packet)
-
+        # The following appears necessary
+        # may be part of acknowledging subscribe
+        print("_packet_queue: self._out_packet =", self._out_packet)
         self._out_packet.append(mpkt)
         if self._current_out_packet is None and len(self._out_packet) > 0:
             self._current_out_packet = self._out_packet.pop(0)
 
-        print("self._out_packet =", self._out_packet)
+        print("_packet_queue: self._out_packet =", self._out_packet)
         if not self._in_callback: 
             return self.loop_write()
         else:
             return MQTT_ERR_SUCCESS
 
-    #def _packet_handle(self):
-    #    print("_packet_handle")
-    #    cmd = self._in_packet['command']&0xF0
-    #    if cmd == PUBLISH: #appear to need PUBLISH
-    #        return self._handle_publish()
-    #    elif cmd == CONNACK:
-    #        return self._handle_connack()
-    #    elif cmd == SUBACK:
-    #        return self._handle_suback()
-    #    else:
-    #        print("_packet_handle: did't recognice command -", cmd)
-    #        # If we don't recognise the command, return an error straight away.
-    #        return MQTT_ERR_PROTOCOL
-
 ############################################3
- def _packet_handle(self):
+    def _packet_handle(self):
         cmd = self._in_packet['command']&0xF0
-        if cmd == PINGREQ:
-            print("_packet_handle: PINGREQ")
-            return self._handle_pingreq()
-        elif cmd == PINGRESP:
-            print("_packet_handle: PINGRESP")
-            return self._handle_pingresp()
-        elif cmd == PUBACK:
-            print("_packet_handle: PUBACK")
-            return self._handle_pubackcomp("PUBACK")
-        elif cmd == PUBCOMP:
-            print("_packet_handle: PUBCOMP")
-            return self._handle_pubackcomp("PUBCOMP")
-        elif cmd == PUBLISH:
-            print("_packet_handle: PUBLISH")
-            return self._handle_publish()
-        elif cmd == PUBREC:
-            print("_packet_handle: PUBREC")
-            return self._handle_pubrec()
-        elif cmd == PUBREL:
-            print("_packet_handle: PUBREL")
-            return self._handle_pubrel()
-        elif cmd == CONNACK:
+        if cmd == CONNACK: #needed
             print("_packet_handle: CONNACK")
             return self._handle_connack()
-        elif cmd == SUBACK:
+        elif cmd == SUBACK: #needed
             print("_packet_handle: SUBACK")
             return self._handle_suback()
-        elif cmd == UNSUBACK:
-            return self._handle_unsuback()
+        elif cmd == PINGRESP: #needed
+            print("_packet_handle: PINGRESP")
+            return self._handle_pingresp()
+        elif cmd == PUBLISH: #needed
+            print("_packet_handle: PUBLISH")
+            return self._handle_publish()
+        #elif cmd == PINGREQ:
+        #    print("_packet_handle: PINGREQ")
+        #    return self._handle_pingreq()
+        #elif cmd == PUBACK:
+        #    print("_packet_handle: PUBACK")
+        #    return self._handle_pubackcomp("PUBACK")
+        #elif cmd == PUBCOMP:
+        #    print("_packet_handle: PUBCOMP")
+        #    return self._handle_pubackcomp("PUBCOMP")
+        #elif cmd == PUBREC:
+        #    print("_packet_handle: PUBREC")
+        #    return self._handle_pubrec()
+        #elif cmd == PUBREL:
+        #    print("_packet_handle: PUBREL")
+        #    return self._handle_pubrel()
+        #elif cmd == UNSUBACK:
+        #    return self._handle_unsuback()
         else:
             # If we don't recognise the command, return an error straight away.
-            self._easy_log(MQTT_LOG_ERR, "Error: Unrecognised command "+str(cmd))
+            print("_packet_haandle: didn't recognize command")
             return MQTT_ERR_PROTOCOL
 #############################################
+    #def _handle_pingreq(self):
+    #    print("_handle_pingreq")
+    #    if self._strict_protocol:
+    #        if self._in_packet['remaining_length'] != 0:
+    #            return MQTT_ERR_PROTOCOL
+
+    #    return self._send_pingresp()
+
+    def _handle_pingresp(self):
+        print("_handle_pingresp")
+        #if self._strict_protocol:
+        #    if self._in_packet['remaining_length'] != 0:
+        #        return MQTT_ERR_PROTOCOL
+
+        # No longer waiting for a PINGRESP.
+        self._ping_t = 0
+        return MQTT_ERR_SUCCESS
 
     def _handle_connack(self):
         print("_handle_connack") #needed
-        if self._strict_protocol:
-            if self._in_packet['remaining_length'] != 2:
-                return MQTT_ERR_PROTOCOL
+        #if self._strict_protocol:
+        #    if self._in_packet['remaining_length'] != 2:
+        #        return MQTT_ERR_PROTOCOL
 
         if len(self._in_packet['packet']) != 2:
             return MQTT_ERR_PROTOCOL

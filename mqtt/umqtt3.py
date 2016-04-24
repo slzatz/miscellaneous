@@ -1,21 +1,13 @@
 # Copyright (c) 2012-2014 Roger Light <roger@atchoo.org>
 #
-# This is a stripped down version of paho.mqtt intended for micropython
+# This is a much stripped down version of Roger Light's paho.mqtt intended for micropython
 # All rights reserved. This program and the accompanying materials
 # are made available under the terms of the Eclipse Public License v1.0
-# and Eclipse Distribution License v1.0 which accompany this distribution.
+# and Eclipse Distribution License v1.0
 #
-# The Eclipse Public License is available at
-#    http://www.eclipse.org/legal/epl-v10.html
-# and the Eclipse Distribution License is available at
-#   http://www.eclipse.org/org/documents/edl-v10.php.
-#
-# Contributors:
-#    Roger Light - initial API and implementation
 
 """
-This is an MQTT v3.1 client module. MQTT is a lightweight pub/sub messaging
-protocol that is easy to implement and suitable for low powered devices.
+This is an MQTT v3.1 client module for micropython.
 """
 import select
 import socket
@@ -24,25 +16,16 @@ import utime as time
 
 EAGAIN = const(11)
 
-MQTTv31 = const(3)
-MQTTv311 = const(4)
-
-PROTOCOL_NAMEv31 = b"MQIsdp"
-PROTOCOL_NAMEv311 = b"MQTT"
-
-PROTOCOL_VERSION = const(3)
+#PROTOCOL_NAMEv31 = b"MQIsdp" protocol=3
 
 # Message types
-CONNECT = const(0x10) #needed
-CONNACK = const(0x20) #needed
-PUBLISH = const(0x30) #needed
-SUBSCRIBE = const(0x80) #needed
-SUBACK = const(0x90) #needed
-PINGREQ = 0xC0 #needed
-PINGRESP = const(0xD0) #needed
-
-# CONNACK codes
-CONNACK_REFUSED_PROTOCOL_VERSION = 1
+CONNECT = const(0x10) 
+CONNACK = const(0x20) 
+PUBLISH = const(0x30) 
+SUBSCRIBE = const(0x80) 
+SUBACK = const(0x90) 
+PINGREQ = 0xC0 
+PINGRESP = const(0xD0) 
 
 # Connection state
 mqtt_cs_new = 0
@@ -58,22 +41,9 @@ MQTT_ERR_NO_CONN = 4
 MQTT_ERR_CONN_REFUSED = 5
 MQTT_ERR_CONN_LOST = 7
 
-class MQTTMessage:
-    """ This is a class that describes an incoming message."""
-    def __init__(self):
-        print("MQTTMessage Class")
-        self.timestamp = 0
-        self.state = 0 #mqtt_ms_invalid
-        self.dup = 0 #False
-        self.mid = 0
-        self.topic = ""
-        self.payload = None
-        self.qos = 0
-        self.retain = 0 #False
-
 class Client:
     """MQTT version 3.1/3.1.1 client class."""
-    def __init__(self, client_id="", userdata=None, protocol=MQTTv31):
+    def __init__(self, client_id="", userdata=None, protocol=3):
         print("Client Class")
         self._protocol = protocol
         self._userdata = userdata
@@ -98,8 +68,7 @@ class Client:
             "to_process": 0,
             "pos": 0}
         self._current_out_packet = None
-        self._last_msg_in = time.time()
-        self._last_msg_out = time.time()
+        self._last_msg = time.time()
         self._ping_t = 0
         self._last_mid = 0
         self._state = mqtt_cs_new
@@ -145,8 +114,7 @@ class Client:
 
         self._current_out_packet = None
 
-        self._last_msg_in = time.time()
-        self._last_msg_out = time.time()
+        self._last_msg = time.time()
 
         self._ping_t = 0
         print("reconnect: self._state =", self._state)
@@ -322,7 +290,7 @@ class Client:
             to_process=0,
             pos=0)
 
-        self._last_msg_in = time.time()
+        self._last_msg = time.time()
         return rc
 
     def _packet_write(self):
@@ -346,39 +314,22 @@ class Client:
             else:
                 break
 
-        self._last_msg_out = time.time()
+        self._last_msg = time.time()
         print("_packet_write: end: self._current_out_packet =", self._current_out_packet)
         return MQTT_ERR_SUCCESS
 
     def _check_keepalive(self):
         print("_check_keepalive")
         now = time.time()
-        print("_check_keepalive: self._last_msg_out = ", self._last_msg_out)
-        print("_check_keepalive: self._last_msg_in = ", self._last_msg_in)
-        last_msg_out = self._last_msg_out
-        last_msg_in = self._last_msg_in
-        if (self._sock is not None) and (now - last_msg_out >= self._keepalive or now - last_msg_in >= self._keepalive):
+        print("_check_keepalive: self._last_msg = ", self._last_msg)
+        last_msg = self._last_msg
+        if (self._sock is not None) and (now - last_msg >= self._keepalive):
             print("_check_keepalive: self._state =", self._state)
             if self._ping_t == 0:
                 #self._send_pingreq()
                 packet = struct.pack('!BB', PINGREQ, 0)
                 self._packet_queue(PINGREQ, packet, 0, 0)
-                self._last_msg_out = now
-                self._last_msg_in = now
-
-            #if self._state == mqtt_cs_connected and self._ping_t == 0:
-            #    self._send_pingreq()
-            #    self._last_msg_out = now
-            #    self._last_msg_in = now
-            #else:
-            #    if self._sock:
-            #        self._sock.close()
-            #        self._sock = None
-
-            #    if self._state == mqtt_cs_disconnecting:
-            #        rc = MQTT_ERR_SUCCESS
-            #    else:
-            #        rc = 1
+                self._last_msg = now
 
     def _mid_generate(self):
         print("_mid_generate")
@@ -386,14 +337,6 @@ class Client:
         if self._last_mid == 65536:
             self._last_mid = 1
         return self._last_mid
-
-    #def _send_pingreq(self):
-    #    packet = struct.pack('!BB', PINGREQ, 0)
-    #    self._packet_queue(PINGREQ, packet, 0, 0)
-    #    #rc = self._packet_queue(PINGREQ, packet, 0, 0)
-    #    #if rc == MQTT_ERR_SUCCESS:
-    #    #    self._ping_t = time.time()
-    #    #return rc
 
     def _pack_remaining_length(self, packet, remaining_length):
         print("_pack_remaining_length")
@@ -425,13 +368,9 @@ class Client:
 
     def _send_connect(self, keepalive):
         print("_send_connect")
-        if self._protocol == MQTTv31:
-            protocol = PROTOCOL_NAMEv31
-            proto_ver = 3
-        else:
-            protocol = PROTOCOL_NAMEv311
-            proto_ver = 4
-        remaining_length = 2+len(protocol) + 1+1+2 + 2+len(self._client_id)
+
+        remaining_length = 2+6+1+1+2+2+len(self._client_id)
+        #remaining_length = 2+len(protocol) + 1+1+2 + 2+len(self._client_id)
         connect_flags = 0
         connect_flags = connect_flags | 0x02
 
@@ -447,7 +386,8 @@ class Client:
         packet.extend(struct.pack("!B", command))
 
         self._pack_remaining_length(packet, remaining_length)
-        packet.extend(struct.pack("!H"+str(len(protocol))+"sBBH", len(protocol), protocol, proto_ver, connect_flags, keepalive))
+        #packet.extend(struct.pack("!H"+str(len(protocol))+"sBBH", len(protocol), protocol, proto_ver, connect_flags, keepalive))
+        packet.extend(struct.pack("!H"+"6"+"sBBH", 6, b"MQIsdp", 3, connect_flags, keepalive))
 
         self._pack_str16(packet, self._client_id)
 
@@ -491,6 +431,7 @@ class Client:
         return self.loop_write()
 
     def _packet_handle(self):
+        print("_packet_handle")
         cmd = self._in_packet['command']&0xF0
         if cmd == CONNACK: #needed
             print("_packet_handle: CONNACK")
@@ -523,10 +464,7 @@ class Client:
             return MQTT_ERR_PROTOCOL
 
         (flags, result) = struct.unpack("!BB", self._in_packet['packet'])
-        if result == CONNACK_REFUSED_PROTOCOL_VERSION and self._protocol == MQTTv311:
-            # Downgrade to MQTT v3.1
-            self._protocol = MQTTv31
-            return self.reconnect()
+        # Do now support downgrade to MQTT v3.1
 
         if result == 0:
             self._state = mqtt_cs_connected
@@ -561,18 +499,16 @@ class Client:
         rc = 0
         print("_handle_publish") #needed after packet_handle
         header = self._in_packet['command']
-        message = MQTTMessage()
 
         pack_format = "!H" + str(len(self._in_packet['packet'])-2) + 's'
         (slen, packet) = struct.unpack(pack_format, self._in_packet['packet'])
         pack_format = '!' + str(slen) + 's' + str(len(packet)-slen) + 's'
-        (message.topic, packet) = struct.unpack(pack_format, packet)
+        topic, packet = struct.unpack(pack_format, packet) 
 
         # message.topic = b'test'
-
-        message.topic = message.topic.decode('utf-8')
-        message.payload = packet
-        message.timestamp = time.time()
-
-        self.on_message(self, self._userdata, message)
-        return MQTT_ERR_SUCCESS
+        msg = {} 
+        msg['topic'] = topic.decode('utf-8') 
+        msg['payload'] =  packet 
+        msg['timestamp'] = time.time() 
+        self.on_message(self, self._userdata, msg) 
+        return 0

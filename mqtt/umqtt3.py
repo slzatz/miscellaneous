@@ -64,12 +64,12 @@ class MQTTMessage:
         print("MQTTMessage Class")
         self.timestamp = 0
         self.state = 0 #mqtt_ms_invalid
-        self.dup = False
+        self.dup = 0 #False
         self.mid = 0
         self.topic = ""
         self.payload = None
         self.qos = 0
-        self.retain = False
+        self.retain = 0 #False
 
 class Client:
     """MQTT version 3.1/3.1.1 client class."""
@@ -97,7 +97,6 @@ class Client:
             "packet": b"",
             "to_process": 0,
             "pos": 0}
-        self._out_packet = []
         self._current_out_packet = None
         self._last_msg_in = time.time()
         self._last_msg_out = time.time()
@@ -113,9 +112,9 @@ class Client:
         self._port = 1883
         self._bind_address = ""
 
-    def __del__(self):
-        print("__del__ Client")
-        pass
+    #def __del__(self):
+    #    print("__del__ Client")
+    #    pass
 
     def connect(self, host, port=1883, keepalive=60, bind_address=""):
         """Connect to a remote broker.
@@ -131,13 +130,8 @@ class Client:
         return self.reconnect()
 
     def reconnect(self):
-        """Reconnect the client after a disconnect. Can only be called after
-        connect()/connect_async()."""
+        """Reconnect the client after a disconnect."""
         print("reconnect")
-        #if len(self._host) == 0:
-        #    raise ValueError('Invalid host.')
-        #if self._port <= 0:
-        #    raise ValueError('Invalid port number.')
 
         self._in_packet = {
             "command": 0,
@@ -148,8 +142,6 @@ class Client:
             "packet": b"",
             "to_process": 0,
             "pos": 0}
-
-        self._out_packet = []
 
         self._current_out_packet = None
 
@@ -188,7 +180,6 @@ class Client:
                 if rc or (self._sock is None):
                     return rc
 
-        #return self.loop_misc()
         if self._sock is None:
             return MQTT_ERR_NO_CONN
 
@@ -242,13 +233,8 @@ class Client:
             return MQTT_ERR_NO_CONN
 
         rc = self._packet_read() #only call to _packet_read
-        if rc > 0:
-            #return self._loop_rc_handle(rc)
-            return rc
-        elif rc == MQTT_ERR_AGAIN:
-            return MQTT_ERR_SUCCESS
-
-        return MQTT_ERR_SUCCESS
+        print("loop_read: rc =", rc)
+        return rc
 
     def loop_write(self):
         """Process write network events.""" 
@@ -257,12 +243,7 @@ class Client:
             return MQTT_ERR_NO_CONN
 
         rc = self._packet_write()
-        if rc > 0:
-            #return self._loop_rc_handle(rc)
-            return rc
-        elif rc == MQTT_ERR_AGAIN:
-            return MQTT_ERR_SUCCESS
-        return MQTT_ERR_SUCCESS
+        return rc
 
     # ============================================================
     # Private functions
@@ -353,12 +334,7 @@ class Client:
 
             try:
                 write_length = self._sock.send(packet['packet'][packet['pos']:])
-            except AttributeError:
-                return MQTT_ERR_SUCCESS
-            except socket.error as err:
-                if err.errno == EAGAIN:
-                    return MQTT_ERR_AGAIN
-                print(err)
+            except:
                 return 1
 
             if write_length > 0:
@@ -366,11 +342,7 @@ class Client:
                 packet['pos'] = packet['pos'] + write_length
 
                 if packet['to_process'] == 0:
-
-                    if len(self._out_packet) > 0:
-                        self._current_out_packet = self._out_packet.pop(0)
-                    else:
-                        self._current_out_packet = None
+                    self._current_out_packet = None
             else:
                 break
 
@@ -387,19 +359,26 @@ class Client:
         last_msg_in = self._last_msg_in
         if (self._sock is not None) and (now - last_msg_out >= self._keepalive or now - last_msg_in >= self._keepalive):
             print("_check_keepalive: self._state =", self._state)
-            if self._state == mqtt_cs_connected and self._ping_t == 0:
-                self._send_pingreq()
+            if self._ping_t == 0:
+                #self._send_pingreq()
+                packet = struct.pack('!BB', PINGREQ, 0)
+                self._packet_queue(PINGREQ, packet, 0, 0)
                 self._last_msg_out = now
                 self._last_msg_in = now
-            else:
-                if self._sock:
-                    self._sock.close()
-                    self._sock = None
 
-                if self._state == mqtt_cs_disconnecting:
-                    rc = MQTT_ERR_SUCCESS
-                else:
-                    rc = 1
+            #if self._state == mqtt_cs_connected and self._ping_t == 0:
+            #    self._send_pingreq()
+            #    self._last_msg_out = now
+            #    self._last_msg_in = now
+            #else:
+            #    if self._sock:
+            #        self._sock.close()
+            #        self._sock = None
+
+            #    if self._state == mqtt_cs_disconnecting:
+            #        rc = MQTT_ERR_SUCCESS
+            #    else:
+            #        rc = 1
 
     def _mid_generate(self):
         print("_mid_generate")
@@ -408,11 +387,13 @@ class Client:
             self._last_mid = 1
         return self._last_mid
 
-    def _send_pingreq(self):
-        rc = self._send_simple_command(PINGREQ)
-        if rc == MQTT_ERR_SUCCESS:
-            self._ping_t = time.time()
-        return rc
+    #def _send_pingreq(self):
+    #    packet = struct.pack('!BB', PINGREQ, 0)
+    #    self._packet_queue(PINGREQ, packet, 0, 0)
+    #    #rc = self._packet_queue(PINGREQ, packet, 0, 0)
+    #    #if rc == MQTT_ERR_SUCCESS:
+    #    #    self._ping_t = time.time()
+    #    #return rc
 
     def _pack_remaining_length(self, packet, remaining_length):
         print("_pack_remaining_length")
@@ -441,13 +422,6 @@ class Client:
             packet.extend(struct.pack(pack_format, len(udata), udata))
         else:
             raise TypeError
-
-    def _send_simple_command(self, command):
-        print("_send_simple_command")
-        # For DISCONNECT, PINGREQ and PINGRESP
-        remaining_length = 0
-        packet = struct.pack('!BB', command, remaining_length)
-        return self._packet_queue(command, packet, 0, 0)
 
     def _send_connect(self, keepalive):
         print("_send_connect")
@@ -512,14 +486,8 @@ class Client:
             pos = 0,
             to_process = len(packet),
             packet = packet)
-        # The following appears necessary
-        # may be part of acknowledging subscribe
-        print("_packet_queue: self._out_packet =", self._out_packet)
-        self._out_packet.append(mpkt)
-        if self._current_out_packet is None and len(self._out_packet) > 0:
-            self._current_out_packet = self._out_packet.pop(0)
 
-        print("_packet_queue: self._out_packet =", self._out_packet)
+        self._current_out_packet = mpkt
         return self.loop_write()
 
     def _packet_handle(self):
@@ -546,7 +514,7 @@ class Client:
 
         # No longer waiting for a PINGRESP.
         self._ping_t = 0
-        return MQTT_ERR_SUCCESS
+        return 0
 
     def _handle_connack(self):
         print("_handle_connack") #needed
@@ -594,30 +562,17 @@ class Client:
         print("_handle_publish") #needed after packet_handle
         header = self._in_packet['command']
         message = MQTTMessage()
-        message.dup = (header & 0x08)>>3
-        #message.qos = (header & 0x06)>>1
-        message.retain = (header & 0x01)
 
         pack_format = "!H" + str(len(self._in_packet['packet'])-2) + 's'
         (slen, packet) = struct.unpack(pack_format, self._in_packet['packet'])
         pack_format = '!' + str(slen) + 's' + str(len(packet)-slen) + 's'
         (message.topic, packet) = struct.unpack(pack_format, packet)
 
-        #if len(message.topic) == 0:
-        #    return MQTT_ERR_PROTOCOL
+        # message.topic = b'test'
 
         message.topic = message.topic.decode('utf-8')
-
         message.payload = packet
-
         message.timestamp = time.time()
-        #print("_handle_publish:  message.qos = ", message.qos)
-        #if message.qos == 0:
-        #    print("_handle_publish: location 1")
-        #    self.on_message(self, self._userdata, message)
-        #    return MQTT_ERR_SUCCESS
-        #else:
-        #    print("_handle_publish: location 2")
-        #    return MQTT_ERR_PROTOCOL
 
         self.on_message(self, self._userdata, message)
+        return MQTT_ERR_SUCCESS

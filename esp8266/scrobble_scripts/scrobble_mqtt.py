@@ -71,8 +71,8 @@ def run():
   while 1:
     m = s.recv(1024)
     if m:
-      topic = m[4:4+m[3]]
-      msg = m[4+m[3]:]
+      topic = m[5:5+m[4]]
+      msg = m[5+m[4]:]
       #print("topic: {}; msg: {}".format(topic.decode('utf-8'), msg.decode('utf-8')))
       #print(m)
       zzz = json.loads(msg.decode('utf-8'))

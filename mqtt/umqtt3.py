@@ -340,7 +340,8 @@ class Client:
 
     def _pack_remaining_length(self, packet, remaining_length):
         print("_pack_remaining_length")
-        remaining_bytes = []
+        #from _send_subscribe and _send_connect
+        #remaining_bytes = [] ? not used for anything
         while True:
             byte = remaining_length % 128
             remaining_length = remaining_length // 128
@@ -348,7 +349,7 @@ class Client:
             if remaining_length > 0:
                 byte = byte | 0x80
 
-            remaining_bytes.append(byte)
+            #remaining_bytes.append(byte)
             packet.extend(struct.pack("!B", byte))
             if remaining_length == 0:
                 # FIXME - this doesn't deal with incorrectly large payloads
@@ -403,13 +404,22 @@ class Client:
     def _send_subscribe(self, dup, topics):
         print("_send_subscribe")
         remaining_length = 2
+
+        #topic_qos_list = [(topic.encode('utf-8'), qos)] - > [('test', 0)]
+        #remaining_length = 2 + 2+ len('test') +1 --> 9
         for t in topics:
             remaining_length = remaining_length + 2+len(t[0])+1
 
+        #SUBSCRIBE = const(0x80) - > 0b10000000
+        # According to spec the fixed header is 0b10000010 
+        # According to spec the second byte is the remaining length = 2 bytes of varialbe header + payload
+        # If QoS is zero the variable header is 0,0 or if > 1 would be some unique identifier
+        # dup = 0 (I think)
+        # 1<<1 -> 0b00000010
         command = SUBSCRIBE | (dup<<3) | (1<<1)
         packet = bytearray()
         packet.extend(struct.pack("!B", command))
-        self._pack_remaining_length(packet, remaining_length)
+        self._pack_remaining_length(packet, remaining_length) #operates on packet and extends it
         local_mid = self._mid_generate()
         packet.extend(struct.pack("!H", local_mid))
         for t in topics:
@@ -499,7 +509,9 @@ class Client:
         rc = 0
         print("_handle_publish") #needed after packet_handle
         header = self._in_packet['command']
-
+        #!H = ! means Network Byte Order, Size, and Alignment with H means unsigned short 2 bytes
+        # For the 's' format character, the count is interpreted as the length of the bytes, not a repeat count like for the other format characters; for example, '10s' means a single 10-byte string
+        # return  mtPacket(0b00110001, mtStr(topic), data)
         pack_format = "!H" + str(len(self._in_packet['packet'])-2) + 's'
         (slen, packet) = struct.unpack(pack_format, self._in_packet['packet'])
         pack_format = '!' + str(slen) + 's' + str(len(packet)-slen) + 's'

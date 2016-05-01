@@ -81,8 +81,8 @@ def run():
       d.clear()
       d.display()
       d.draw_text(0, 0, msg[:20])
-      d.draw_text(0, 0, msg[20:40])
-      d.draw_text(0, 0, msg[40:60])
+      d.draw_text(0, 12, msg[20:40])
+      d.draw_text(0, 24, msg[40:60])
       #d.draw_text(0, 0, zzz['artist'][:20]) #########
       #d.draw_text(0, 12, zzz['title'][:20]) ##########
       #d.draw_text(0, 24, zzz['title'][20:]) ##########

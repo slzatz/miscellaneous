@@ -64,7 +64,7 @@ def run():
   m = s.recv(100)
   print("CONNACK = ",m)
   sleep(1) 
-  s.send(mtpSubscribe("test"))
+  s.send(mtpSubscribe("sonos/ct/current_track"))
   m = s.recv(100)
   print("SUBACK = ",m)
 

@@ -12,7 +12,8 @@ def on_connect(client, userdata, flags, rc):
 
 # The callback for when a PUBLISH message is received from the server.
 def on_message(client, userdata, msg):
-    print(msg.topic+" "+str(msg.payload))
+    #print(msg.topic+" "+str(msg.payload))
+    print('new'+msg['topic']+str(msg['payload']))
 
 client = mqtt.Client()
 client.on_connect = on_connect
@@ -23,4 +24,4 @@ client.connect("54.173.234.69", 1883, 60)
 while 1:
     client.loop()
     print(time.time())
-    time.sleep(1)
+    time.sleep(4)

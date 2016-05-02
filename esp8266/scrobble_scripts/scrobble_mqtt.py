@@ -71,17 +71,35 @@ def run():
   while 1:
     m = s.recv(1024)
     if m:
-      topic = m[5:5+m[4]]
-      msg = m[5+m[4]:]
-      #print("topic: {}; msg: {}".format(topic.decode('utf-8'), msg.decode('utf-8')))
-      #print(m)
+      #print("first byte =", m[0]) #first byte should be 48
+      #print("second byte =", m[1])
+      # see spec but basically if first remaining length byte is 
+      # > 128 then the highest bit is signalling continuation
+      # and the following byte contributes 128 x it's value
+
+      # note that remaining_length and topic used for debugging but not otherwise used
+      if m[1] > 127:
+        remaining_length = m[2]*128 + m[1] - 128
+        i = 5
+      else:
+        remaining_length = m[1]
+        i = 4
+
+      #print("remaining length =", remaining_length)
+
+      #topic = m[i:i+m[i-1]]
+      #print("topic =", topic.decode('utf-8'))
+
+      msg = m[i+m[i-1]:]
+      #print("msg =", msg.decode('utf-8'))
+
       zzz = json.loads(msg.decode('utf-8'))
   
       d.clear()
       d.display()
-      d.draw_text(0, 0, zzz['artist'][:20]) #########
-      d.draw_text(0, 12, zzz['title'][:20]) ##########
-      d.draw_text(0, 24, zzz['title'][20:]) ##########
+      d.draw_text(0, 0, zzz['artist'][:20]) 
+      d.draw_text(0, 12, zzz['title'][:20]) 
+      d.draw_text(0, 24, zzz['title'][20:])
       d.display()
     sleep(1)
 

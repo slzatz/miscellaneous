@@ -64,7 +64,7 @@ def run():
   m = s.recv(100)
   print("CONNACK = ",m)
   sleep(1) 
-  s.send(mtpSubscribe("sonos/ct/current_track"))
+  s.send(mtpSubscribe("sonos/nyc/current_track"))
   m = s.recv(100)
   print("SUBACK = ",m)
 
@@ -101,7 +101,7 @@ def run():
       d.draw_text(0, 12, zzz['title'][:20]) 
       d.draw_text(0, 24, zzz['title'][20:])
       d.display()
-    sleep(1)
+    sleep(3)
 
 #s.send(mtpDisconnect())
 #s.close()

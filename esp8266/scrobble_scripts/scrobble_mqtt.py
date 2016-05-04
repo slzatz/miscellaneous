@@ -1,5 +1,6 @@
 # Borrowed heavily from Andrew http://forum.micropython.org/viewtopic.php?t=1101#p6545
 
+import gc
 from time import sleep
 import socket
 import json
@@ -62,10 +63,12 @@ def run():
   s.connect((host, 1883))
   s.send(mtpConnect("somename"))
   m = s.recv(100)
+  # need to get the return code
   print("CONNACK = ",m)
   sleep(1) 
   s.send(mtpSubscribe("sonos/nyc/current_track"))
   m = s.recv(100)
+  # need to get the return code
   print("SUBACK = ",m)
 
   while 1:
@@ -101,6 +104,8 @@ def run():
       d.draw_text(0, 12, zzz['title'][:20]) 
       d.draw_text(0, 24, zzz['title'][20:])
       d.display()
+
+    print(gc.mem_free())
     sleep(3)
 
 #s.send(mtpDisconnect())

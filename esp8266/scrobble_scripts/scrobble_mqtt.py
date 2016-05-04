@@ -60,6 +60,7 @@ def run():
   print('network config:', wlan.ifconfig())     
 
   s = socket.socket()
+  #s.settimeout(0)
   s.connect((host, 1883))
   s.send(mtpConnect("somename"))
   m = s.recv(100)
@@ -71,8 +72,14 @@ def run():
   # need to get the return code
   print("SUBACK = ",m)
 
+  #s.settimeout(5)
+  #try:
+  #  s.recv(200)
+  #except:
+  #  pass
+
   while 1:
-    m = s.recv(1024)
+    m = s.recv(200)
     if m:
       #print("first byte =", m[0]) #first byte should be 48
       #print("second byte =", m[1])
@@ -105,6 +112,7 @@ def run():
       d.draw_text(0, 24, zzz['title'][20:])
       d.display()
 
+    gc.collect()
     print(gc.mem_free())
     sleep(3)
 

@@ -102,14 +102,21 @@ def run():
 
       msg = m[i+m[i-1]:]
       #print("msg =", msg.decode('utf-8'))
+      msg = msg.decode('utf-8')
 
-      zzz = json.loads(msg.decode('utf-8'))
-  
       d.clear()
       d.display()
-      d.draw_text(0, 0, zzz['artist'][:20]) 
-      d.draw_text(0, 12, zzz['title'][:20]) 
-      d.draw_text(0, 24, zzz['title'][20:])
+
+      if len(msg) < 20:
+        d.draw_text(16, 24, msg)
+      else:
+        #zzz = json.loads(msg.decode('utf-8'))
+        zzz = json.loads(msg)
+  
+        d.draw_text(0, 0, zzz['artist'][:20]) 
+        d.draw_text(0, 12, zzz['title'][:20]) 
+        d.draw_text(0, 24, zzz['title'][20:])
+
       d.display()
 
     gc.collect()

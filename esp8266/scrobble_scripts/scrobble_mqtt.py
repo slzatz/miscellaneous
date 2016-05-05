@@ -104,14 +104,14 @@ def run():
       #print("msg =", msg.decode('utf-8'))
       msg = msg.decode('utf-8')
 
-      d.clear()
-      d.display()
-
       if len(msg) < 20:
-        d.draw_text(16, 24, msg)
+        d.draw_text(64, 24, msg)
       else:
         #zzz = json.loads(msg.decode('utf-8'))
         zzz = json.loads(msg)
+
+        d.clear()
+        d.display()
   
         d.draw_text(0, 0, zzz['artist'][:20]) 
         d.draw_text(0, 12, zzz['title'][:20]) 

@@ -102,14 +102,15 @@ def run():
 
       msg = m[i+m[i-1]:]
       #print("msg =", msg.decode('utf-8'))
-      msg = msg.decode('utf-8')
+      #msg = msg.decode('utf-8')
 
-      if len(msg) < 20:
-        d.draw_text(64, 24, msg)
+      zzz = json.loads(msg.decode('utf-8'))
+
+      if 'position' in zzz:
+        # not clearing the display because adding time
+        d.draw_text(75, 24, zzz['position']) 
+      
       else:
-        #zzz = json.loads(msg.decode('utf-8'))
-        zzz = json.loads(msg)
-
         d.clear()
         d.display()
   

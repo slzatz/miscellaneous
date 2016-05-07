@@ -47,6 +47,12 @@ def mtpSubscribe(topic):
         bytes([0x00,0x00]), #MSB, LSB for packet identifier; test case no identifier
         mtStr(topic) + bytes([0x00])) #last two bits of last byte is QoS; test case = 0
 
+def mtpUnsubscribe(topic):
+    return mtPacket(
+        0b10100010, #unsubscribe command byte
+        bytes([0x00,0x00]), #MSB, LSB for packet identifier; test case no identifier
+        mtStr(topic) ) #last two bits of last byte is QoS; test case = 0
+
 ###########################################################
 
 def run():
@@ -66,12 +72,14 @@ def run():
   m = s.recv(100)
   # need to get the return code
   print("CONNACK = ",m)
-  sleep(1) 
-  s.send(mtpSubscribe("sonos/nyc/current_track"))
+  #sleep(3) 
+  s.send(mtpUnsubscribe("sonos/nyc/current_track"))
+  m = s.recv(100)
+  s.send(mtpSubscribe("sonos/ct/current_track"))
   m = s.recv(100)
   # need to get the return code
   print("SUBACK = ",m)
-
+  sleep(3) 
   #s.settimeout(5)
   #try:
   #  s.recv(200)
@@ -101,7 +109,9 @@ def run():
       #print("topic =", topic.decode('utf-8'))
 
       msg = m[i+m[i-1]:]
-      #print("msg =", msg.decode('utf-8'))
+      if msg == b'STOPPED':
+        print("msg =", msg)
+        continue
       #msg = msg.decode('utf-8')
 
       zzz = json.loads(msg.decode('utf-8'))

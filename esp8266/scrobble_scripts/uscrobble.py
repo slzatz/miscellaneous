@@ -36,8 +36,8 @@ louder = umqtt.mtpPublish('sonos/ct', '{"action":"louder"}')
 s = socket.socket()
 p0 = Pin(0, Pin.IN, Pin.PULL_UP)
 p2 = Pin(2, Pin.IN, Pin.PULL_UP)
-p0.irq(Pin.IRQ_RISING, callback_louder)
-p2.irq(Pin.IRQ_RISING, callback_quieter)
+p0.irq(trigger=Pin.IRQ_RISING, handler=callback_louder)
+p2.irq(trigger=Pin.IRQ_RISING, handler=callback_quieter)
 
 def run():
   wlan = network.WLAN(network.STA_IF)

@@ -26,14 +26,42 @@ def mtpPublish(topic, data):
   return  mtPacket(0b00110001, mtStr(topic), data)
 
 def mtpSubscribe(topic):
-    return mtPacket(
-        0b10000010, #subscribe command byte
-        bytes([0x00,0x00]), #MSB, LSB for packet identifier; test case no identifier
-        mtStr(topic) + bytes([0x00])) #last two bits of last byte is QoS; test case = 0
+  return mtPacket(
+    0b10000010, #subscribe command byte
+    bytes([0x00,0x00]), #MSB, LSB for packet identifier; test case no identifier
+    mtStr(topic) + bytes([0x00])) #last two bits of last byte is QoS; test case = 0
 
 def mtpUnsubscribe(topic):
     return mtPacket(
         0b10100010, #unsubscribe command byte
         bytes([0x00,0x00]), #MSB, LSB for packet identifier; test case no identifier
         mtStr(topic) ) #last two bits of last byte is QoS; test case = 0
+
+def mtpReceive(sock):
+  sock.setblocking(False)
+  try:
+    res = sock.recv(1) #read(1)
+    print("res = ",res)
+  except:
+    print("Exception: Nothing received")
+    return None
+
+  if res[0]&240 != 48:
+    print("res =", res)
+    return None
+
+  sock.setblocking(True)
+  m = sock.recv(200)
+  if m[0] > 127:
+    remaining_length = m[1]*128 + m[0] - 128
+    i = 4
+  else:
+    remaining_length = m[0]
+    i = 3
+
+  #print("remaining length =", remaining_length)
+  topic = m[i:i+m[i-1]]
+  #print("topic =", topic.decode('utf-8'))
+  msg = m[i+m[i-1]:]
+  return (topic, msg)
 

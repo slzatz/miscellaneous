@@ -1,16 +1,10 @@
 '''
->>> from umqtt import MQTTClient as m
->>> c = m('abc', '54.173.234.69')
-server = 54.173.234.69
-54.173.234.69 1883
->>> c.connect()
->>> c.publish('test', 'hello world')
->>>
-MicroPython rawsocket module supports file interface directly
+Based on Paul Sokolovsky's work on micropython mqtt client
+Note MicroPython rawsocket module supports file interface directly
 '''
 
-import socket as socket
-import struct as struct
+import usocket as socket
+import ustruct as struct
 #from binascii import hexlify
 import time
 
@@ -73,13 +67,18 @@ class MQTTClient:
 
     def check_msg(self):
         self.sock.setblocking(False)
-        try:
-            res = self.sock.recv(1) #read(1)
-            #print("res = ",res)
-            #print(bin(res))
-        except:
-            #print("Exception: No data")
+        #try:
+        #    res = self.sock.recv(1) #read(1)
+        #    #print("res = ",res)
+        #    #print(bin(res))
+        #except:
+        #    #print("Exception: No data")
+        #    return None
+
+        res = self.sock.read(1)
+        if res is None:
             return None
+
         #if res[0] >> 4 !=3: #more general but not handling QoS > 0
         # should now add the ping response and then there shouldn't be
         # collision between server sending ping response and a new msg

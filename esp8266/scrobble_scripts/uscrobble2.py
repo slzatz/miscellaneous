@@ -1,13 +1,12 @@
 '''
-This micropython script does two things:
-1) if songs are being scrobbled by sonos_scrobble.py it displays them on the feather OLED
-   and also displays the time the song has been playing
-2) The top bottom (A) increases the volume and the bottom button (B) decreases the volume
+This micropython script displays songs that are being scrobbled to the mqtt 
+broker running in AWS EC2 and also the top bottom (A) increases the volume 
+and the bottom button (B) decreases the volume
+Unlike earlier version, this version does ping the broker to keep it alive
 '''
 
 import gc
-from time import sleep
-import socket
+from time import sleep, time
 import json
 import network
 from config import host, ssid, pw
@@ -22,18 +21,22 @@ d.init_display()
 d.draw_text(0, 0, "HELLO STEVE")
 d.display()
 
+c = umc('abc', host)
+
+b = bytearray(1)
+# mtpPublish is a class method that produces a bytes object that is used in
+# the callback where we can't allocate any memory on the heap
+quieter = umc.mtpPublish('sonos/ct', '{"action":"quieter"}')
+louder = umc.mtpPublish('sonos/ct', '{"action":"louder"}')
+
 def callback_louder(p):
-  b[0] = s.send(louder)
+  b[0] = c.sock.send(louder)
   print("change pin", p, b[0])
  
 def callback_quieter(p):
-  b[0] = s.send(quieter)
+  b[0] = c.sock.send(quieter)
   print("change pin", p, b[0])
 
-b = bytearray(2)
-quieter = umqtt.mtpPublish('sonos/ct', '{"action":"quieter"}')
-louder = umqtt.mtpPublish('sonos/ct', '{"action":"louder"}')
-s = socket.socket()
 p0 = Pin(0, Pin.IN, Pin.PULL_UP)
 p2 = Pin(2, Pin.IN, Pin.PULL_UP)
 p0.irq(trigger=Pin.IRQ_RISING, handler=callback_louder)
@@ -49,11 +52,11 @@ def run():
       pass
   print('network config:', wlan.ifconfig())     
 
-  c = umc('abc', host)
+  #c = umc('abc', host)
   c.connect()
   c.subscribe('sonos/ct/current_track')
 
-  cur_time = time.time()
+  cur_time = time()
   b = True
   sleep(2) 
 
@@ -62,18 +65,19 @@ def run():
     if z:
       print(z)
       if isinstance(z, int):
-        print("returned a command")
+        print("returned a integer")
+        d.draw_text(123, 24, ' ')
         if b:
-          d.draw_text(128, 24, '|') 
+          d.draw_text(123, 24, '|') 
         else:
-          d.draw_text(125, 24, '-') 
+          d.draw_text(123, 24, '-') 
         b = not b
         d.display()
         continue
 
       topic, msg = z
       zz = json.loads(msg.decode('utf-8'))
-      print("returned a tuple")
+      print("assuming a tuple")
       d.clear()
       d.display()
       d.draw_text(0, 0, zz.get('artist', '')[:20]) 
@@ -81,12 +85,11 @@ def run():
       d.draw_text(0, 24, zz.get('title', '')[20:])
       d.display()
 
-    t = time.time()
-    print(t)
-    if t > cur_time + 10:
+    t = time()
+    if t > cur_time + 30:
         c.ping()
         cur_time = t
     gc.collect()
-    print(gc.mem_free())
+    #print(gc.mem_free())
     sleep(1)
 

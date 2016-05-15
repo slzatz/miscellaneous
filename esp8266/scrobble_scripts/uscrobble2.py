@@ -93,3 +93,4 @@ def run():
     #print(gc.mem_free())
     sleep(1)
 
+run()

@@ -1,0 +1,7 @@
+*.pyc
+*.swp
+*.bak
+__*.*
+settings.*
+config.*
+

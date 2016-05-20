@@ -9,7 +9,7 @@ import gc
 from time import sleep, time
 import json
 import network
-from config import host, ssid, pw
+from config import host, ssid, pw, loc
 from ssd1306_min import SSD1306 as SSD
 from umqtt_client import MQTTClient as umc
 from machine import Pin, I2C
@@ -26,8 +26,8 @@ c = umc('abc', host)
 b = bytearray(1)
 # mtpPublish is a class method that produces a bytes object that is used in
 # the callback where we can't allocate any memory on the heap
-quieter = umc.mtpPublish('sonos/ct', '{"action":"quieter"}')
-louder = umc.mtpPublish('sonos/ct', '{"action":"louder"}')
+quieter = umc.mtpPublish('sonos/'+loc, '{"action":"quieter"}')
+louder = umc.mtpPublish('sonos/'+loc, '{"action":"louder"}')
 
 def callback_louder(p):
   b[0] = c.sock.send(louder)
@@ -54,7 +54,7 @@ def run():
 
   #c = umc('abc', host)
   c.connect()
-  c.subscribe('sonos/ct/current_track')
+  c.subscribe('sonos/{}/current_track'.format(loc))
 
   cur_time = time()
   b = True

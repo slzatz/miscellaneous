@@ -9,7 +9,7 @@ import gc
 from time import sleep, time
 import json
 import network
-from config import host, ssid, pw, loc
+from config import host, ssid, pw, loc, mqtt_id
 from ssd1306_min import SSD1306 as SSD
 from umqtt_client import MQTTClient as umc
 from machine import Pin, I2C
@@ -21,26 +21,42 @@ d.init_display()
 d.draw_text(0, 0, "HELLO STEVE")
 d.display()
 
-c = umc('abc', host)
+c = umc(mqtt_id, host)
 
 b = bytearray(1)
 # mtpPublish is a class method that produces a bytes object that is used in
 # the callback where we can't allocate any memory on the heap
 quieter = umc.mtpPublish('sonos/'+loc, '{"action":"quieter"}')
 louder = umc.mtpPublish('sonos/'+loc, '{"action":"louder"}')
+play_pause = umc.mtpPublish('sonos/'+loc, '{"action":"play_pause"}')
 
 def callback_louder(p):
+  if b[0]:
+    print("debounced", p, b[0])
+    return
   b[0] = c.sock.send(louder)
   print("change pin", p, b[0])
  
 def callback_quieter(p):
+  if b[0]:
+    print("debounced", p, b[0])
+    return
   b[0] = c.sock.send(quieter)
+  print("change pin", p, b[0])
+
+def callback_play_pause(p):
+  if b[0]:
+    print("debounced", p, b[0])
+    return
+  b[0] = c.sock.send(play_pause)
   print("change pin", p, b[0])
 
 p0 = Pin(0, Pin.IN, Pin.PULL_UP)
 p2 = Pin(2, Pin.IN, Pin.PULL_UP)
+p13 = Pin(13, Pin.IN, Pin.PULL_UP)
 p0.irq(trigger=Pin.IRQ_RISING, handler=callback_louder)
 p2.irq(trigger=Pin.IRQ_RISING, handler=callback_quieter)
+p13.irq(trigger=Pin.IRQ_RISING, handler=callback_play_pause)
 
 def run():
   wlan = network.WLAN(network.STA_IF)
@@ -57,7 +73,7 @@ def run():
   c.subscribe('sonos/{}/current_track'.format(loc))
 
   cur_time = time()
-  b = True
+  bb = True
   sleep(2) 
 
   while 1:
@@ -67,11 +83,11 @@ def run():
       if isinstance(z, int):
         print("returned a integer")
         d.draw_text(123, 24, ' ')
-        if b:
+        if bb:
           d.draw_text(123, 24, '|') 
         else:
           d.draw_text(123, 24, '-') 
-        b = not b
+        bb = not bb
         d.display()
         continue
 
@@ -91,6 +107,7 @@ def run():
         cur_time = t
     gc.collect()
     #print(gc.mem_free())
+    b[0] = 0 # for debouncing
     sleep(1)
 
 run()

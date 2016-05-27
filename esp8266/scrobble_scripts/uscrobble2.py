@@ -1,8 +1,8 @@
 '''
 This micropython script displays songs that are being scrobbled to the mqtt 
-broker running in AWS EC2 and also the top bottom (A) increases the volume 
-and the bottom button (B) decreases the volume
-Unlike earlier version, this version does ping the broker to keep it alive
+broker running in AWS EC2 and also the top bottom (A) increases the volume, 
+the bottom button (C) decreases the volume and middle (B) play_pauses
+The script also pings the broker to keep it alive
 '''
 
 import gc

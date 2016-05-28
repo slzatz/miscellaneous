@@ -8,6 +8,8 @@ from config import host, loc, mqtt_id
 import json
 
 b = bytearray(1)
+c = umc(mqtt_id, host)
+c.connect()
 
 play_pause = umc.mtpPublish('sonos/'+loc, '{"action":"play_pause"}')
 
@@ -15,19 +17,17 @@ def callback(p):
   if b[0]:
     print("debounced", p, b[0])
     return
-  #b[0] = c.sock.send(play_pause)
+  b[0] = c.sock.send(play_pause)
   print("change pin", p, b[0])
 
 p14 = Pin(14, Pin.IN, Pin.PULL_UP)
 p14.irq(trigger=Pin.IRQ_RISING, handler=callback)
 
-c = umc(mqtt_id, host)
-c.connect()
-
 adc = ADC(0)
-level = 300
 
 def run():
+  print("loc =", loc)
+  level = 300
   while 1:
     new_level = adc.read()
     if abs(new_level-level) > 50:

@@ -9,8 +9,6 @@ import json
 
 b = bytearray(1)
 c = umc(mqtt_id, host)
-c.connect()
-
 play_pause = umc.mtpPublish('sonos/'+loc, '{"action":"play_pause"}')
 
 def callback(p):
@@ -26,6 +24,8 @@ p14.irq(trigger=Pin.IRQ_RISING, handler=callback)
 adc = ADC(0)
 
 def run():
+  c.connect()
+  sleep(2)
   print("loc =", loc)
   level = 300
   while 1:

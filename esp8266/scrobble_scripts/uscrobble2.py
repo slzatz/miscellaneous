@@ -58,6 +58,21 @@ p0.irq(trigger=Pin.IRQ_RISING, handler=callback_louder)
 p2.irq(trigger=Pin.IRQ_RISING, handler=callback_quieter)
 p13.irq(trigger=Pin.IRQ_RISING, handler=callback_play_pause)
 
+def wrap(text,lim):
+  lines = []
+  pos = 0 
+  line = []
+  for word in text.split():
+    if pos + len(word) < lim + 1:
+      line.append(word)
+      pos+= len(word) + 1 
+    else:
+      lines.append(' '.join(line))
+      line = [word] 
+      pos = len(word)
+
+  return lines
+
 def run():
   wlan = network.WLAN(network.STA_IF)
   wlan.active(True)
@@ -97,8 +112,13 @@ def run():
       d.clear()
       d.display()
       d.draw_text(0, 0, zz.get('artist', '')[:20]) 
-      d.draw_text(0, 12, zz.get('title', '')[:20]) 
-      d.draw_text(0, 24, zz.get('title', '')[20:])
+
+      title = wrap(zz.get('title', ''), 20)
+      d.draw_text(0, 12, title[0])
+      if len(title) > 1:
+        d.draw_text(0, 24, title[1])
+      #d.draw_text(0, 12, zz.get('title', '')[:20]) 
+      #d.draw_text(0, 24, zz.get('title', '')[20:])
       d.display()
 
     t = time()

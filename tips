@@ -1,11 +1,15 @@
+:vnew create a vsplit with a blank window
+%v find matching bracket
 za - toggle folding; zR - unfold everything; zM - fold everything.  the following do not seem to do anything right now: zm, zr
 There is a _vimrc in c:\Program Files (x86)\Vim <- this one is being used because commenting out stuff here does affect vim. There are also _gvimrc and _vimrc and _viminfo in c:\Users\szatz (appear not to be in use). As far as vim is concerned $HOME is in H: and it is using the _vimrc because that is where the system _vimrc is kept. Then at some point VIM decided that home was c:\Users\szatz
 :echo $HOME and :version are helpful
 Supports :cd, :pwd, :ls (tells you what files are open same as :buffers :files)
 escape clears the command line
+:vnew create a vsplit with a blank window
 :b2 after ls will open buffer #2
 :badd ft.txt - creates a new buffer for a file without opening it
 :vert sb[buffer]N or :vert Nsb will open buffer N in a vertical split; sbN by itself would be horizontal split
+:w saves the current file
 :w {file} keeps the current file but saves file as something else
 :e! {file} opens the file and overwrites buffer even if something there
 :e # edits the alternate-file (the last one you had open)
@@ -54,13 +58,16 @@ ctrl-w up arrow  - move cursor up a window
 ctrl-w ctrl-w    - move cursor to another window (cycle)
 ctrl-w_          - maximize current window
 ctrl-w=          - make all equal size
+ctrl-w L         - rotate windows horizontally to Right
+ctrl-w H         - rotate windows horizontally to Left
+ctrl-W K         - vertical to horizontal and ctrl-W H the opposite
 10 ctrl-w+       - increase window size by 10 lines
 :vsplit file     - vertical split
 :sview file      - same as split, but readonly
 :hide            - close current window
 :only            - keep only this window open
 :ls              - show current buffers
-:b 2             - open buffer #2 in this window
+:b2             - open buffer #2 in this window
 
 :set            - shows vars different from defaults
 :set all        - shows all values

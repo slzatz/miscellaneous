@@ -9,10 +9,16 @@ import gc
 from time import sleep, time
 import json
 import network
-from config import host, ssid, pw, loc, mqtt_id
+from config import host, ssid, pw, mqtt_id
 from ssd1306_min import SSD1306 as SSD
 from umqtt_client import MQTTClient as umc
 from machine import Pin, I2C
+try:
+  from location import loc
+except ImportError:
+  from config import loc
+
+print("location =",loc)
 
 i2c = I2C(scl=Pin(5), sda=Pin(4), freq=400000)
 
@@ -71,6 +77,7 @@ def wrap(text,lim):
       line = [word] 
       pos = len(word)
 
+  lines.append(' '.join(line))
   return lines
 
 def run():

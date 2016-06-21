@@ -10,7 +10,7 @@ import gc
 from time import sleep, time
 import json
 import network
-from config import host, ssid, pw, mqtt_id
+from config import host, ssid, pw, mqtt_id, port
 from ssd1306_min import SSD1306 as SSD
 from umqtt_client import MQTTClient as umc
 from machine import Pin, I2C, ADC
@@ -28,7 +28,7 @@ d.init_display()
 d.draw_text(0, 0, "HELLO STEVE")
 d.display()
 
-c = umc(mqtt_id, host)
+c = umc(mqtt_id, host, port=port)
 
 b = bytearray(1)
 # mtpPublish is a class method that produces a bytes object that is used in
